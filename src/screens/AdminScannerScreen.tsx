@@ -1,12 +1,26 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { View, Text, StyleSheet, TouchableOpacity, Alert, TextInput, ActivityIndicator } from "react-native"
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  TextInput,
+  ActivityIndicator,
+  SafeAreaView,
+  Platform,
+} from "react-native"
 import { BarCodeScanner } from "expo-barcode-scanner"
 import { Ionicons } from "@expo/vector-icons"
-import { validateQRToken, checkInChild, checkOutChild } from "../services/firebaseService"
+import { validateQRToken, checkInChild, checkOutChild } from "../services/supabaseService"
 
-export default function AdminScannerScreen({ navigation }: any) {
+interface AdminScannerScreenProps {
+  navigation: any
+}
+
+export default function AdminScannerScreen({ navigation }: AdminScannerScreenProps) {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null)
   const [scanned, setScanned] = useState(false)
   const [manualCode, setManualCode] = useState("")
@@ -44,12 +58,12 @@ export default function AdminScannerScreen({ navigation }: any) {
       // Show child information and action options
       Alert.alert(
         "QR Code Válido",
-        `Criança: ${child.name}\nIdade: ${new Date().getFullYear() - child.birthDate.getFullYear()} anos\nTags: ${child.tags.join(" ")}\nStatus: ${session.isActive ? "Brincando" : "Aguardando entrada"}`,
+        `Criança: ${child.name}\nIdade: ${new Date().getFullYear() - new Date(child.birth_date).getFullYear()} anos\nTags: ${child.tags.join(" ")}\nStatus: ${session.is_active ? "Brincando" : "Aguardando entrada"}`,
         [
           { text: "Cancelar", style: "cancel" },
           {
-            text: session.isActive ? "Fazer Saída" : "Fazer Entrada",
-            onPress: () => handleCheckInOut(session.id!, session.isActive),
+            text: session.is_active ? "Fazer Saída" : "Fazer Entrada",
+            onPress: () => handleCheckInOut(session.id!, session.is_active),
           },
         ],
       )
@@ -93,30 +107,30 @@ export default function AdminScannerScreen({ navigation }: any) {
 
   if (hasPermission === null) {
     return (
-      <View style={styles.container}>
-        <Text>Solicitando permissão da câmera...</Text>
-      </View>
+      <SafeAreaView style={styles.container}>
+        <Text style={styles.permissionText}>Solicitando permissão da câmera...</Text>
+      </SafeAreaView>
     )
   }
 
   if (hasPermission === false) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container}>
         <Text style={styles.errorText}>Sem acesso à câmera</Text>
         <Text style={styles.errorSubtext}>Permita o acesso à câmera nas configurações do app</Text>
-      </View>
+      </SafeAreaView>
     )
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
+        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Scanner QR Code</Text>
-        <TouchableOpacity onPress={() => setScannerActive(!scannerActive)}>
+        <TouchableOpacity onPress={() => setScannerActive(!scannerActive)} activeOpacity={0.7}>
           <Ionicons name={scannerActive ? "pause" : "play"} size={24} color="white" />
         </TouchableOpacity>
       </View>
@@ -143,8 +157,14 @@ export default function AdminScannerScreen({ navigation }: any) {
             value={manualCode}
             onChangeText={setManualCode}
             autoCapitalize="characters"
+            placeholderTextColor="#9CA3AF"
           />
-          <TouchableOpacity style={styles.validateButton} onPress={handleManualValidation} disabled={loading}>
+          <TouchableOpacity
+            style={styles.validateButton}
+            onPress={handleManualValidation}
+            disabled={loading}
+            activeOpacity={0.8}
+          >
             {loading ? (
               <ActivityIndicator size="small" color="white" />
             ) : (
@@ -156,12 +176,12 @@ export default function AdminScannerScreen({ navigation }: any) {
 
       {/* Reset Button */}
       {scanned && (
-        <TouchableOpacity style={styles.resetButton} onPress={resetScanner}>
+        <TouchableOpacity style={styles.resetButton} onPress={resetScanner} activeOpacity={0.8}>
           <Ionicons name="refresh" size={20} color="#3B82F6" />
           <Text style={styles.resetButtonText}>Escanear Novamente</Text>
         </TouchableOpacity>
       )}
-    </View>
+    </SafeAreaView>
   )
 }
 
@@ -169,6 +189,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#000",
+  },
+  permissionText: {
+    color: "white",
+    fontSize: 16,
+    textAlign: "center",
   },
   header: {
     flexDirection: "row",
@@ -238,7 +263,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 12,
     fontSize: 14,
-    fontFamily: "monospace",
+    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
+    color: "#1f2937",
   },
   validateButton: {
     backgroundColor: "#3B82F6",

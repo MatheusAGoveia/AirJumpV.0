@@ -1,13 +1,31 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from "react-native"
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+  ScrollView,
+  SafeAreaView,
+  Platform,
+} from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import QRCode from "react-native-qrcode-svg"
-import { generateQRSession, getDoc, doc, type QRSession, type Child } from "../services/firebaseService"
-import { db } from "../../App"
+import { generateQRSession, getChild } from "../services/supabaseService"
+import type { Database } from "../lib/database.types"
 
-export default function QRCodeScreen({ route, navigation }: any) {
+type Child = Database["public"]["Tables"]["children"]["Row"]
+type QRSession = Database["public"]["Tables"]["qr_sessions"]["Row"]
+
+interface QRCodeScreenProps {
+  route: any
+  navigation: any
+}
+
+export default function QRCodeScreen({ route, navigation }: QRCodeScreenProps) {
   const { childId } = route.params
   const [child, setChild] = useState<Child | null>(null)
   const [qrSession, setQrSession] = useState<QRSession | null>(null)
@@ -28,15 +46,8 @@ export default function QRCodeScreen({ route, navigation }: any) {
 
   const loadChildData = async () => {
     try {
-      const childDoc = await getDoc(doc(db, "children", childId))
-      if (childDoc.exists()) {
-        setChild({
-          id: childDoc.id,
-          ...childDoc.data(),
-          birthDate: childDoc.data().birthDate.toDate(),
-          createdAt: childDoc.data().createdAt.toDate(),
-        } as Child)
-      }
+      const childData = await getChild(childId)
+      setChild(childData)
     } catch (error) {
       console.error("Error loading child:", error)
       Alert.alert("Erro", "Não foi possível carregar os dados da criança")
@@ -60,7 +71,7 @@ export default function QRCodeScreen({ route, navigation }: any) {
     if (!qrSession) return
 
     const now = new Date()
-    const diff = qrSession.expiresAt.getTime() - now.getTime()
+    const diff = new Date(qrSession.expires_at).getTime() - now.getTime()
 
     if (diff <= 0) {
       setTimeLeft("Expirado")
@@ -88,7 +99,7 @@ export default function QRCodeScreen({ route, navigation }: any) {
       })
     }
 
-    if (child.hasDisability) {
+    if (child.has_disability) {
       alerts.push({
         icon: "medical",
         color: "#EF4444",
@@ -111,25 +122,25 @@ export default function QRCodeScreen({ route, navigation }: any) {
 
   if (loading || !child || !qrSession) {
     return (
-      <View style={styles.loadingContainer}>
+      <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#3B82F6" />
         <Text style={styles.loadingText}>Gerando QR Code...</Text>
-      </View>
+      </SafeAreaView>
     )
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
+        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7}>
           <Ionicons name="arrow-back" size={24} color="#1f2937" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>QR Code de Entrada</Text>
         <View style={{ width: 24 }} />
       </View>
 
-      <View style={styles.content}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Child Info */}
         <View style={styles.childCard}>
           <View style={styles.childAvatar}>
@@ -153,8 +164,10 @@ export default function QRCodeScreen({ route, navigation }: any) {
                 ))}
               </View>
             </View>
-            <Text style={styles.childAge}>{new Date().getFullYear() - child.birthDate.getFullYear()} anos</Text>
-            {child.medicalNotes && <Text style={styles.medicalNotes}>⚕️ {child.medicalNotes}</Text>}
+            <Text style={styles.childAge}>
+              {new Date().getFullYear() - new Date(child.birth_date).getFullYear()} anos
+            </Text>
+            {child.medical_notes && <Text style={styles.medicalNotes}>⚕️ {child.medical_notes}</Text>}
           </View>
         </View>
 
@@ -175,7 +188,7 @@ export default function QRCodeScreen({ route, navigation }: any) {
             </View>
           </View>
 
-          <TouchableOpacity style={styles.refreshButton} onPress={generateQR}>
+          <TouchableOpacity style={styles.refreshButton} onPress={generateQR} activeOpacity={0.8}>
             <Ionicons name="refresh" size={16} color="#3B82F6" />
             <Text style={styles.refreshButtonText}>Renovar QR Code</Text>
           </TouchableOpacity>
@@ -217,8 +230,8 @@ export default function QRCodeScreen({ route, navigation }: any) {
             </View>
           </View>
         </View>
-      </View>
-    </View>
+      </ScrollView>
+    </SafeAreaView>
   )
 }
 
@@ -231,6 +244,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "#f8fafc",
   },
   loadingText: {
     marginTop: 16,
@@ -353,7 +367,7 @@ const styles = StyleSheet.create({
   },
   qrToken: {
     fontSize: 12,
-    fontFamily: "monospace",
+    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
     backgroundColor: "#f3f4f6",
     paddingHorizontal: 12,
     paddingVertical: 8,

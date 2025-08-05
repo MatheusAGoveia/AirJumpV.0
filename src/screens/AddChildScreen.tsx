@@ -1,12 +1,27 @@
 "use client"
 
 import { useState } from "react"
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, Switch, Platform } from "react-native"
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  Alert,
+  Switch,
+  Platform,
+  SafeAreaView,
+} from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import DateTimePicker from "@react-native-community/datetimepicker"
-import { addChild } from "../services/firebaseService"
+import { addChild } from "../services/supabaseService"
 
-export default function AddChildScreen({ navigation }: any) {
+interface AddChildScreenProps {
+  navigation: any
+}
+
+export default function AddChildScreen({ navigation }: AddChildScreenProps) {
   const [name, setName] = useState("")
   const [birthDate, setBirthDate] = useState(new Date())
   const [showDatePicker, setShowDatePicker] = useState(false)
@@ -28,7 +43,6 @@ export default function AddChildScreen({ navigation }: any) {
         birthDate,
         medicalNotes: medicalNotes.trim(),
         hasDisability,
-        parentId: "", // Will be set in the service
       })
 
       Alert.alert("Sucesso", "Criança cadastrada com sucesso!", [{ text: "OK", onPress: () => navigation.goBack() }])
@@ -48,17 +62,17 @@ export default function AddChildScreen({ navigation }: any) {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
+        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7}>
           <Ionicons name="arrow-back" size={24} color="#1f2937" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Cadastrar Criança</Text>
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.form}>
           <Text style={styles.formTitle}>Informações da Criança</Text>
           <Text style={styles.formSubtitle}>Preencha os dados para garantir a segurança e diversão</Text>
@@ -72,13 +86,14 @@ export default function AddChildScreen({ navigation }: any) {
               value={name}
               onChangeText={setName}
               autoCapitalize="words"
+              placeholderTextColor="#9CA3AF"
             />
           </View>
 
           {/* Data de Nascimento */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Data de Nascimento *</Text>
-            <TouchableOpacity style={styles.dateInput} onPress={() => setShowDatePicker(true)}>
+            <TouchableOpacity style={styles.dateInput} onPress={() => setShowDatePicker(true)} activeOpacity={0.8}>
               <Ionicons name="calendar-outline" size={20} color="#666" />
               <Text style={styles.dateText}>{birthDate.toLocaleDateString("pt-BR")}</Text>
             </TouchableOpacity>
@@ -104,6 +119,8 @@ export default function AddChildScreen({ navigation }: any) {
               onChangeText={setMedicalNotes}
               multiline
               numberOfLines={3}
+              textAlignVertical="top"
+              placeholderTextColor="#9CA3AF"
             />
             <Text style={styles.helperText}>Informações importantes para a segurança da criança</Text>
           </View>
@@ -129,7 +146,7 @@ export default function AddChildScreen({ navigation }: any) {
                   <Text style={styles.benefitItem}>• Responsável deve permanecer na loja</Text>
                 </View>
 
-                <TouchableOpacity style={styles.documentUpload}>
+                <TouchableOpacity style={styles.documentUpload} activeOpacity={0.8}>
                   <Ionicons name="cloud-upload-outline" size={24} color="#3B82F6" />
                   <Text style={styles.documentUploadText}>Upload do documento comprobatório</Text>
                   <Text style={styles.documentUploadSubtext}>Laudo médico ou documento oficial</Text>
@@ -152,12 +169,13 @@ export default function AddChildScreen({ navigation }: any) {
             style={[styles.submitButton, loading && styles.submitButtonDisabled]}
             onPress={handleSubmit}
             disabled={loading}
+            activeOpacity={0.8}
           >
             <Text style={styles.submitButtonText}>{loading ? "Cadastrando..." : "Cadastrar Criança"}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   )
 }
 
@@ -222,6 +240,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     backgroundColor: "white",
+    color: "#1f2937",
   },
   textArea: {
     height: 80,

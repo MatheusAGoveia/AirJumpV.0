@@ -20,6 +20,7 @@ import PartyBookingScreen from "./src/screens/PartyBookingScreen"
 import SupportScreen from "./src/screens/SupportScreen"
 import AdminDashboardScreen from "./src/screens/AdminDashboardScreen"
 import AdminScannerScreen from "./src/screens/AdminScannerScreen"
+import LoadingScreen from "./src/screens/LoadingScreen"
 
 const Stack = createStackNavigator()
 const Tab = createBottomTabNavigator()
@@ -41,16 +42,21 @@ function MainTabNavigator() {
         tabBarIcon: ({ focused, color, size }) => {
           let iconName: keyof typeof Ionicons.glyphMap
 
-          if (route.name === "Dashboard") {
-            iconName = focused ? "home" : "home-outline"
-          } else if (route.name === "AddChild") {
-            iconName = focused ? "person-add" : "person-add-outline"
-          } else if (route.name === "Party") {
-            iconName = focused ? "calendar" : "calendar-outline"
-          } else if (route.name === "Support") {
-            iconName = focused ? "chatbubble" : "chatbubble-outline"
-          } else {
-            iconName = "home-outline"
+          switch (route.name) {
+            case "Dashboard":
+              iconName = focused ? "home" : "home-outline"
+              break
+            case "AddChild":
+              iconName = focused ? "person-add" : "person-add-outline"
+              break
+            case "Party":
+              iconName = focused ? "calendar" : "calendar-outline"
+              break
+            case "Support":
+              iconName = focused ? "chatbubble" : "chatbubble-outline"
+              break
+            default:
+              iconName = "home-outline"
           }
 
           return <Ionicons name={iconName} size={size} color={color} />
@@ -94,7 +100,7 @@ export default function App() {
   }, [])
 
   if (isLoading) {
-    return null // Loading screen
+    return <LoadingScreen />
   }
 
   return (

@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  SafeAreaView,
 } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { signIn, signUp } from "../services/supabaseService"
@@ -62,80 +63,87 @@ export default function LoginScreen() {
   }
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.header}>
-          <View style={styles.logo}>
-            <Text style={styles.logoText}>AJ</Text>
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView style={styles.keyboardView} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+        <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+          <View style={styles.header}>
+            <View style={styles.logo}>
+              <Text style={styles.logoText}>AJ</Text>
+            </View>
+            <Text style={styles.title}>Air Jump</Text>
+            <Text style={styles.subtitle}>Monte Carmo - Diversão Segura</Text>
           </View>
-          <Text style={styles.title}>Air Jump</Text>
-          <Text style={styles.subtitle}>Monte Carmo - Diversão Segura</Text>
-        </View>
 
-        <View style={styles.form}>
-          {!isLogin && (
+          <View style={styles.form}>
+            {!isLogin && (
+              <View style={styles.inputContainer}>
+                <Ionicons name="person-outline" size={20} color="#666" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Nome Completo"
+                  value={name}
+                  onChangeText={setName}
+                  autoCapitalize="words"
+                  placeholderTextColor="#9CA3AF"
+                />
+              </View>
+            )}
+
             <View style={styles.inputContainer}>
-              <Ionicons name="person-outline" size={20} color="#666" style={styles.inputIcon} />
+              <Ionicons name="mail-outline" size={20} color="#666" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Nome Completo"
-                value={name}
-                onChangeText={setName}
-                autoCapitalize="words"
+                placeholder="E-mail"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                placeholderTextColor="#9CA3AF"
               />
             </View>
-          )}
 
-          <View style={styles.inputContainer}>
-            <Ionicons name="mail-outline" size={20} color="#666" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="E-mail"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-          </View>
+            {!isLogin && (
+              <View style={styles.inputContainer}>
+                <Ionicons name="call-outline" size={20} color="#666" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Telefone"
+                  value={phone}
+                  onChangeText={setPhone}
+                  keyboardType="phone-pad"
+                  placeholderTextColor="#9CA3AF"
+                />
+              </View>
+            )}
 
-          {!isLogin && (
             <View style={styles.inputContainer}>
-              <Ionicons name="call-outline" size={20} color="#666" style={styles.inputIcon} />
+              <Ionicons name="lock-closed-outline" size={20} color="#666" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Telefone"
-                value={phone}
-                onChangeText={setPhone}
-                keyboardType="phone-pad"
+                placeholder="Senha"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                placeholderTextColor="#9CA3AF"
               />
             </View>
-          )}
 
-          <View style={styles.inputContainer}>
-            <Ionicons name="lock-closed-outline" size={20} color="#666" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Senha"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
+            <TouchableOpacity
+              style={[styles.button, loading && styles.buttonDisabled]}
+              onPress={handleAuth}
+              disabled={loading}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.buttonText}>{loading ? "Aguarde..." : isLogin ? "Entrar" : "Cadastrar"}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.switchButton} onPress={() => setIsLogin(!isLogin)} activeOpacity={0.7}>
+              <Text style={styles.switchText}>{isLogin ? "Não tem conta? Cadastre-se" : "Já tem conta? Entre"}</Text>
+            </TouchableOpacity>
           </View>
-
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleAuth}
-            disabled={loading}
-          >
-            <Text style={styles.buttonText}>{loading ? "Aguarde..." : isLogin ? "Entrar" : "Cadastrar"}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.switchButton} onPress={() => setIsLogin(!isLogin)}>
-            <Text style={styles.switchText}>{isLogin ? "Não tem conta? Cadastre-se" : "Já tem conta? Entre"}</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   )
 }
 
@@ -143,6 +151,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f8fafc",
+  },
+  keyboardView: {
+    flex: 1,
   },
   scrollContainer: {
     flexGrow: 1,
@@ -198,6 +209,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 16,
     paddingHorizontal: 12,
+    backgroundColor: "white",
   },
   inputIcon: {
     marginRight: 12,
@@ -206,6 +218,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 48,
     fontSize: 16,
+    color: "#1f2937",
   },
   button: {
     backgroundColor: "#3B82F6",
@@ -226,6 +239,7 @@ const styles = StyleSheet.create({
   switchButton: {
     marginTop: 16,
     alignItems: "center",
+    paddingVertical: 8,
   },
   switchText: {
     color: "#3B82F6",

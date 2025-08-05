@@ -1,23 +1,32 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, Alert } from "react-native"
+import { useState, useCallback } from "react"
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, Alert, SafeAreaView } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
-import { signOut } from "firebase/auth"
-import { auth } from "../../App"
-import { getChildren, getLoyaltyProgram, type Child, type LoyaltyProgram } from "../services/firebaseService"
+import { useFocusEffect } from "@react-navigation/native"
+import { signOut } from "../services/supabaseService"
+import { getChildren, getLoyaltyProgram } from "../services/supabaseService"
 import { calculateAge } from "../utils/qrUtils"
+import { supabase } from "../lib/supabase"
+import type { Database } from "../lib/database.types"
 
-export default function DashboardScreen({ navigation }: any) {
+type Child = Database["public"]["Tables"]["children"]["Row"]
+type LoyaltyProgram = Database["public"]["Tables"]["loyalty_programs"]["Row"]
+
+interface DashboardScreenProps {
+  navigation: any
+}
+
+export default function DashboardScreen({ navigation }: DashboardScreenProps) {
   const [children, setChildren] = useState<Child[]>([])
   const [loyalty, setLoyalty] = useState<LoyaltyProgram | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [user, setUser] = useState<any>(null)
 
   const loadData = async () => {
     try {
       const [childrenData, loyaltyData] = await Promise.all([getChildren(), getLoyaltyProgram()])
-
       setChildren(childrenData)
       setLoyalty(loyaltyData)
     } catch (error) {
@@ -29,9 +38,19 @@ export default function DashboardScreen({ navigation }: any) {
     }
   }
 
-  useEffect(() => {
-    loadData()
-  }, [])
+  const loadUser = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    setUser(user)
+  }
+
+  useFocusEffect(
+    useCallback(() => {
+      loadData()
+      loadUser()
+    }, []),
+  )
 
   const onRefresh = () => {
     setRefreshing(true)
@@ -41,12 +60,12 @@ export default function DashboardScreen({ navigation }: any) {
   const handleLogout = () => {
     Alert.alert("Sair", "Deseja realmente sair da sua conta?", [
       { text: "Cancelar", style: "cancel" },
-      { text: "Sair", onPress: () => signOut(auth) },
+      { text: "Sair", onPress: () => signOut() },
     ])
   }
 
   const renderChild = (child: Child) => {
-    const age = calculateAge(child.birthDate)
+    const age = calculateAge(new Date(child.birth_date))
 
     return (
       <View key={child.id} style={styles.childCard}>
@@ -73,11 +92,15 @@ export default function DashboardScreen({ navigation }: any) {
               </View>
             </View>
             <Text style={styles.childAge}>{age} anos</Text>
-            {child.medicalNotes && <Text style={styles.medicalNotes}>⚕️ {child.medicalNotes}</Text>}
+            {child.medical_notes && <Text style={styles.medicalNotes}>⚕️ {child.medical_notes}</Text>}
           </View>
         </View>
 
-        <TouchableOpacity style={styles.qrButton} onPress={() => navigation.navigate("QRCode", { childId: child.id })}>
+        <TouchableOpacity
+          style={styles.qrButton}
+          onPress={() => navigation.navigate("QRCode", { childId: child.id })}
+          activeOpacity={0.8}
+        >
           <Ionicons name="qr-code" size={20} color="white" />
           <Text style={styles.qrButtonText}>QR Code</Text>
         </TouchableOpacity>
@@ -87,111 +110,126 @@ export default function DashboardScreen({ navigation }: any) {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <SafeAreaView style={styles.loadingContainer}>
         <Text>Carregando...</Text>
-      </View>
+      </SafeAreaView>
     )
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-    >
-      {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Olá, {auth.currentUser?.displayName}! 👋</Text>
-          <Text style={styles.subtitle}>Air Jump Monte Carmo</Text>
+    <SafeAreaView style={styles.container}>
+      <ScrollView
+        style={styles.scrollView}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.greeting}>Olá, {user?.user_metadata?.full_name || "Usuário"}! 👋</Text>
+            <Text style={styles.subtitle}>Air Jump Monte Carmo</Text>
+          </View>
+          <TouchableOpacity onPress={handleLogout} activeOpacity={0.7}>
+            <Ionicons name="log-out-outline" size={24} color="#666" />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={24} color="#666" />
-        </TouchableOpacity>
-      </View>
 
-      {/* Loyalty Program */}
-      {loyalty && (
-        <View style={styles.loyaltyCard}>
-          <View style={styles.loyaltyHeader}>
-            <View style={styles.loyaltyTitle}>
-              <Ionicons name="star" size={20} color="#F59E0B" />
-              <Text style={styles.loyaltyText}>Programa Fidelidade</Text>
+        {/* Loyalty Program */}
+        {loyalty && (
+          <View style={styles.loyaltyCard}>
+            <View style={styles.loyaltyHeader}>
+              <View style={styles.loyaltyTitle}>
+                <Ionicons name="star" size={20} color="#F59E0B" />
+                <Text style={styles.loyaltyText}>Programa Fidelidade</Text>
+              </View>
+              <View style={styles.loyaltyBadge}>
+                <Text style={styles.loyaltyBadgeText}>{loyalty.seals}/10 selos</Text>
+              </View>
             </View>
-            <View style={styles.loyaltyBadge}>
-              <Text style={styles.loyaltyBadgeText}>{loyalty.seals}/10 selos</Text>
+
+            <View style={styles.progressContainer}>
+              <View style={styles.progressBar}>
+                <View style={[styles.progressFill, { width: `${(loyalty.seals / 10) * 100}%` }]} />
+              </View>
+              <Text style={styles.progressText}>{10 - loyalty.seals} selos para entrada gratuita</Text>
             </View>
+
+            {loyalty.seals >= 9 && (
+              <View style={styles.almostThereAlert}>
+                <Ionicons name="gift" size={16} color="#F59E0B" />
+                <Text style={styles.almostThereText}>
+                  Quase lá! Mais {10 - loyalty.seals} selo para entrada gratuita! 🏰
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Children List */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Minhas Crianças</Text>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => navigation.navigate("AddChild")}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="add" size={16} color="#3B82F6" />
+              <Text style={styles.addButtonText}>Adicionar</Text>
+            </TouchableOpacity>
           </View>
 
-          <View style={styles.progressContainer}>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${(loyalty.seals / 10) * 100}%` }]} />
+          {children.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="people-outline" size={48} color="#9CA3AF" />
+              <Text style={styles.emptyStateText}>Nenhuma criança cadastrada</Text>
+              <Text style={styles.emptyStateSubtext}>Adicione uma criança para começar a usar o Air Jump</Text>
             </View>
-            <Text style={styles.progressText}>{10 - loyalty.seals} selos para entrada gratuita</Text>
-          </View>
-
-          {loyalty.seals >= 9 && (
-            <View style={styles.almostThereAlert}>
-              <Ionicons name="gift" size={16} color="#F59E0B" />
-              <Text style={styles.almostThereText}>
-                Quase lá! Mais {10 - loyalty.seals} selo para entrada gratuita! 🏰
-              </Text>
-            </View>
+          ) : (
+            children.map(renderChild)
           )}
         </View>
-      )}
 
-      {/* Children List */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Minhas Crianças</Text>
-          <TouchableOpacity style={styles.addButton} onPress={() => navigation.navigate("AddChild")}>
-            <Ionicons name="add" size={16} color="#3B82F6" />
-            <Text style={styles.addButtonText}>Adicionar</Text>
-          </TouchableOpacity>
-        </View>
+        {/* Quick Actions */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Ações Rápidas</Text>
+          <View style={styles.quickActions}>
+            <TouchableOpacity
+              style={styles.quickAction}
+              onPress={() => navigation.navigate("Party")}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="calendar" size={32} color="#8B5CF6" />
+              <Text style={styles.quickActionTitle}>Agendar Festa</Text>
+              <Text style={styles.quickActionSubtitle}>Comemore conosco</Text>
+            </TouchableOpacity>
 
-        {children.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="people-outline" size={48} color="#9CA3AF" />
-            <Text style={styles.emptyStateText}>Nenhuma criança cadastrada</Text>
-            <Text style={styles.emptyStateSubtext}>Adicione uma criança para começar a usar o Air Jump</Text>
+            <TouchableOpacity
+              style={styles.quickAction}
+              onPress={() => navigation.navigate("Support")}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="chatbubble" size={32} color="#3B82F6" />
+              <Text style={styles.quickActionTitle}>Fale Conosco</Text>
+              <Text style={styles.quickActionSubtitle}>Dúvidas e sugestões</Text>
+            </TouchableOpacity>
           </View>
-        ) : (
-          children.map(renderChild)
-        )}
-      </View>
-
-      {/* Quick Actions */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Ações Rápidas</Text>
-        <View style={styles.quickActions}>
-          <TouchableOpacity style={styles.quickAction} onPress={() => navigation.navigate("Party")}>
-            <Ionicons name="calendar" size={32} color="#8B5CF6" />
-            <Text style={styles.quickActionTitle}>Agendar Festa</Text>
-            <Text style={styles.quickActionSubtitle}>Comemore conosco</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.quickAction} onPress={() => navigation.navigate("Support")}>
-            <Ionicons name="chatbubble" size={32} color="#3B82F6" />
-            <Text style={styles.quickActionTitle}>Fale Conosco</Text>
-            <Text style={styles.quickActionSubtitle}>Dúvidas e sugestões</Text>
-          </TouchableOpacity>
         </View>
-      </View>
 
-      {/* Safety Information */}
-      <View style={styles.safetyCard}>
-        <View style={styles.safetyHeader}>
-          <Ionicons name="shield-checkmark" size={20} color="#F59E0B" />
-          <Text style={styles.safetyTitle}>Lembrete Importante</Text>
+        {/* Safety Information */}
+        <View style={styles.safetyCard}>
+          <View style={styles.safetyHeader}>
+            <Ionicons name="shield-checkmark" size={20} color="#F59E0B" />
+            <Text style={styles.safetyTitle}>Lembrete Importante</Text>
+          </View>
+          <View style={styles.safetyList}>
+            <Text style={styles.safetyItem}>• Crianças com deficiência: responsável deve permanecer na loja</Text>
+            <Text style={styles.safetyItem}>• Menores de 5 anos precisam de acompanhante maior de 18 anos</Text>
+            <Text style={styles.safetyItem}>• Menores de 18 anos desacompanhados precisam de autorização</Text>
+          </View>
         </View>
-        <View style={styles.safetyList}>
-          <Text style={styles.safetyItem}>• Crianças com deficiência: responsável deve permanecer na loja</Text>
-          <Text style={styles.safetyItem}>• Menores de 5 anos precisam de acompanhante maior de 18 anos</Text>
-          <Text style={styles.safetyItem}>• Menores de 18 anos desacompanhados precisam de autorização</Text>
-        </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   )
 }
 
@@ -200,10 +238,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f8fafc",
   },
+  scrollView: {
+    flex: 1,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "#f8fafc",
   },
   header: {
     flexDirection: "row",
