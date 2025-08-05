@@ -1,31 +1,16 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-  TextInput,
-  ActivityIndicator,
-  SafeAreaView,
-  Platform,
-} from "react-native"
+import { View, Text, TouchableOpacity, StyleSheet, Alert } from "react-native"
 import { BarCodeScanner } from "expo-barcode-scanner"
 import { Ionicons } from "@expo/vector-icons"
-import { validateQRToken, checkInChild, checkOutChild } from "../services/supabaseService"
+import { childrenService, visitService } from "../services/supabaseService"
+import { decodeQRCode } from "../utils/qrUtils"
 
-interface AdminScannerScreenProps {
-  navigation: any
-}
-
-export default function AdminScannerScreen({ navigation }: AdminScannerScreenProps) {
+export default function AdminScannerScreen({ navigation }: any) {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null)
   const [scanned, setScanned] = useState(false)
-  const [manualCode, setManualCode] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [scannerActive, setScannerActive] = useState(true)
+  const [processing, setProcessing] = useState(false)
 
   useEffect(() => {
     const getBarCodeScannerPermissions = async () => {
@@ -36,152 +21,119 @@ export default function AdminScannerScreen({ navigation }: AdminScannerScreenPro
     getBarCodeScannerPermissions()
   }, [])
 
-  const handleBarCodeScanned = ({ type, data }: { type: string; data: string }) => {
-    setScanned(true)
-    processQRCode(data)
-  }
+  const handleBarCodeScanned = async ({ type, data }: any) => {
+    if (scanned || processing) return
 
-  const processQRCode = async (qrData: string) => {
-    setLoading(true)
+    setScanned(true)
+    setProcessing(true)
 
     try {
-      const validation = await validateQRToken(qrData)
+      // Decode QR code
+      const qrData = decodeQRCode(data)
 
-      if (!validation.valid || !validation.session || !validation.child) {
-        Alert.alert("QR Code Inválido", "Este QR Code não é válido ou expirou")
-        resetScanner()
+      if (!qrData) {
+        Alert.alert("Erro", "QR Code inválido")
         return
       }
 
-      const { session, child } = validation
+      if (qrData.expired) {
+        Alert.alert("Erro", "QR Code expirado. Solicite um novo código.")
+        return
+      }
 
-      // Show child information and action options
-      Alert.alert(
-        "QR Code Válido",
-        `Criança: ${child.name}\nIdade: ${new Date().getFullYear() - new Date(child.birth_date).getFullYear()} anos\nTags: ${child.tags.join(" ")}\nStatus: ${session.is_active ? "Brincando" : "Aguardando entrada"}`,
-        [
-          { text: "Cancelar", style: "cancel" },
-          {
-            text: session.is_active ? "Fazer Saída" : "Fazer Entrada",
-            onPress: () => handleCheckInOut(session.id!, session.is_active),
-          },
-        ],
-      )
-    } catch (error) {
-      console.error("Error processing QR code:", error)
-      Alert.alert("Erro", "Não foi possível processar o QR Code")
-    } finally {
-      setLoading(false)
-      resetScanner()
-    }
-  }
+      // Find child by QR code
+      const child = await childrenService.getChildByQR(data)
 
-  const handleCheckInOut = async (sessionId: string, isCurrentlyActive: boolean) => {
-    try {
-      if (isCurrentlyActive) {
-        await checkOutChild(sessionId)
-        Alert.alert("Sucesso", "Saída registrada com sucesso!")
+      if (!child) {
+        Alert.alert("Erro", "Criança não encontrada")
+        return
+      }
+
+      // Check if child has an active visit
+      const activeVisit = await visitService.getActiveVisit(child.id)
+
+      if (activeVisit) {
+        // Check out
+        const success = await visitService.checkOut(activeVisit.id)
+
+        if (success) {
+          Alert.alert(
+            "Saída Registrada!",
+            `${child.name} saiu do parque.\n\nHorário de saída: ${new Date().toLocaleTimeString("pt-BR")}`,
+            [{ text: "OK", onPress: () => setScanned(false) }],
+          )
+        } else {
+          Alert.alert("Erro", "Não foi possível registrar a saída")
+        }
       } else {
-        await checkInChild(sessionId)
-        Alert.alert("Sucesso", "Entrada registrada com sucesso!")
+        // Check in
+        const visit = await visitService.checkIn(child.id)
+
+        if (visit) {
+          // Update visit count
+          await childrenService.updateVisits(child.id, child.visits + 1)
+
+          Alert.alert(
+            "Entrada Registrada!",
+            `${child.name} entrou no parque.\n\nIdade: ${child.age} anos\nVisitas: ${child.visits + 1}\nHorário: ${new Date().toLocaleTimeString("pt-BR")}`,
+            [{ text: "OK", onPress: () => setScanned(false) }],
+          )
+        } else {
+          Alert.alert("Erro", "Não foi possível registrar a entrada")
+        }
       }
     } catch (error) {
-      console.error("Error checking in/out:", error)
-      Alert.alert("Erro", "Não foi possível registrar a operação")
+      console.error("Error processing QR code:", error)
+      Alert.alert("Erro", "Erro ao processar QR Code")
+    } finally {
+      setProcessing(false)
+      setTimeout(() => setScanned(false), 2000)
     }
-  }
-
-  const resetScanner = () => {
-    setScanned(false)
-    setManualCode("")
-  }
-
-  const handleManualValidation = () => {
-    if (!manualCode.trim()) {
-      Alert.alert("Erro", "Digite o código QR")
-      return
-    }
-
-    processQRCode(manualCode.trim())
   }
 
   if (hasPermission === null) {
     return (
-      <SafeAreaView style={styles.container}>
-        <Text style={styles.permissionText}>Solicitando permissão da câmera...</Text>
-      </SafeAreaView>
+      <View style={styles.container}>
+        <Text>Solicitando permissão da câmera...</Text>
+      </View>
     )
   }
 
   if (hasPermission === false) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         <Text style={styles.errorText}>Sem acesso à câmera</Text>
-        <Text style={styles.errorSubtext}>Permita o acesso à câmera nas configurações do app</Text>
-      </SafeAreaView>
+        <TouchableOpacity style={styles.button} onPress={() => navigation.goBack()}>
+          <Text style={styles.buttonText}>Voltar</Text>
+        </TouchableOpacity>
+      </View>
     )
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
+    <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7}>
-          <Ionicons name="arrow-back" size={24} color="white" />
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Scanner QR Code</Text>
-        <TouchableOpacity onPress={() => setScannerActive(!scannerActive)} activeOpacity={0.7}>
-          <Ionicons name={scannerActive ? "pause" : "play"} size={24} color="white" />
-        </TouchableOpacity>
+        <Text style={styles.title}>Scanner QR Code</Text>
+        <View style={styles.placeholder} />
       </View>
 
-      {/* Scanner */}
-      {scannerActive && (
-        <View style={styles.scannerContainer}>
-          <BarCodeScanner onBarCodeScanned={scanned ? undefined : handleBarCodeScanned} style={styles.scanner} />
+      <BarCodeScanner onBarCodeScanned={scanned ? undefined : handleBarCodeScanned} style={styles.scanner} />
 
-          <View style={styles.scannerOverlay}>
-            <View style={styles.scannerFrame} />
-            <Text style={styles.scannerText}>Posicione o QR Code dentro do quadro</Text>
-          </View>
-        </View>
-      )}
-
-      {/* Manual Input */}
-      <View style={styles.manualSection}>
-        <Text style={styles.manualTitle}>Ou digite o código manualmente:</Text>
-        <View style={styles.manualInputContainer}>
-          <TextInput
-            style={styles.manualInput}
-            placeholder="AJ-XXXXXXXXXXXXXXXX"
-            value={manualCode}
-            onChangeText={setManualCode}
-            autoCapitalize="characters"
-            placeholderTextColor="#9CA3AF"
-          />
-          <TouchableOpacity
-            style={styles.validateButton}
-            onPress={handleManualValidation}
-            disabled={loading}
-            activeOpacity={0.8}
-          >
-            {loading ? (
-              <ActivityIndicator size="small" color="white" />
-            ) : (
-              <Text style={styles.validateButtonText}>Validar</Text>
-            )}
-          </TouchableOpacity>
-        </View>
+      <View style={styles.overlay}>
+        <View style={styles.scanArea} />
+        <Text style={styles.instructionText}>{processing ? "Processando..." : "Aponte a câmera para o QR Code"}</Text>
       </View>
 
-      {/* Reset Button */}
-      {scanned && (
-        <TouchableOpacity style={styles.resetButton} onPress={resetScanner} activeOpacity={0.8}>
-          <Ionicons name="refresh" size={20} color="#3B82F6" />
-          <Text style={styles.resetButtonText}>Escanear Novamente</Text>
+      <View style={styles.footer}>
+        <TouchableOpacity style={styles.resetButton} onPress={() => setScanned(false)} disabled={processing}>
+          <Ionicons name="refresh" size={24} color="#3B82F6" />
+          <Text style={styles.resetText}>Escanear Novamente</Text>
         </TouchableOpacity>
-      )}
-    </SafeAreaView>
+      </View>
+    </View>
   )
 }
 
@@ -190,41 +142,43 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#000",
   },
-  permissionText: {
-    color: "white",
-    fontSize: 16,
-    textAlign: "center",
-  },
   header: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    justifyContent: "space-between",
     padding: 20,
-    backgroundColor: "rgba(0,0,0,0.8)",
-    paddingTop: 50,
+    paddingTop: 60,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1,
   },
-  headerTitle: {
-    fontSize: 18,
+  backButton: {
+    padding: 8,
+  },
+  title: {
+    fontSize: 20,
     fontWeight: "bold",
-    color: "white",
+    color: "#fff",
   },
-  scannerContainer: {
-    flex: 1,
-    position: "relative",
+  placeholder: {
+    width: 40,
   },
   scanner: {
     flex: 1,
   },
-  scannerOverlay: {
+  overlay: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    justifyContent: "center",
     alignItems: "center",
+    justifyContent: "center",
   },
-  scannerFrame: {
+  scanArea: {
     width: 250,
     height: 250,
     borderWidth: 2,
@@ -232,81 +186,52 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: "transparent",
   },
-  scannerText: {
-    color: "white",
+  instructionText: {
+    color: "#fff",
     fontSize: 16,
     textAlign: "center",
     marginTop: 20,
-    paddingHorizontal: 20,
-  },
-  manualSection: {
-    backgroundColor: "white",
-    padding: 20,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
-  manualTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#1f2937",
-    marginBottom: 12,
-  },
-  manualInputContainer: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  manualInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: "#d1d5db",
+    backgroundColor: "rgba(0,0,0,0.7)",
+    padding: 12,
     borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 14,
-    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
-    color: "#1f2937",
   },
-  validateButton: {
-    backgroundColor: "#3B82F6",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-    justifyContent: "center",
+  footer: {
+    position: "absolute",
+    bottom: 60,
+    left: 0,
+    right: 0,
     alignItems: "center",
-    minWidth: 80,
-  },
-  validateButtonText: {
-    color: "white",
-    fontSize: 14,
-    fontWeight: "600",
   },
   resetButton: {
+    backgroundColor: "rgba(255,255,255,0.9)",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "white",
-    marginHorizontal: 20,
-    marginBottom: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#3B82F6",
   },
-  resetButtonText: {
+  resetText: {
     color: "#3B82F6",
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "600",
     marginLeft: 8,
   },
   errorText: {
     fontSize: 18,
-    color: "white",
+    color: "#fff",
     textAlign: "center",
-    marginBottom: 8,
+    marginBottom: 20,
   },
-  errorSubtext: {
-    fontSize: 14,
-    color: "#9CA3AF",
-    textAlign: "center",
+  button: {
+    backgroundColor: "#3B82F6",
+    padding: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    marginHorizontal: 20,
+  },
+  buttonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
 })

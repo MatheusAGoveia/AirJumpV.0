@@ -1,237 +1,108 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-  ScrollView,
-  SafeAreaView,
-  Platform,
-} from "react-native"
+import { View, Text, TouchableOpacity, StyleSheet, Alert, Share } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import QRCode from "react-native-qrcode-svg"
-import { generateQRSession, getChild } from "../services/supabaseService"
+import { childrenService } from "../services/supabaseService"
 import type { Database } from "../lib/database.types"
 
 type Child = Database["public"]["Tables"]["children"]["Row"]
-type QRSession = Database["public"]["Tables"]["qr_sessions"]["Row"]
 
-interface QRCodeScreenProps {
-  route: any
-  navigation: any
-}
-
-export default function QRCodeScreen({ route, navigation }: QRCodeScreenProps) {
+export default function QRCodeScreen({ route, navigation }: any) {
   const { childId } = route.params
   const [child, setChild] = useState<Child | null>(null)
-  const [qrSession, setQrSession] = useState<QRSession | null>(null)
-  const [timeLeft, setTimeLeft] = useState("")
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    loadChildData()
-    generateQR()
+    loadChild()
   }, [])
 
-  useEffect(() => {
-    if (qrSession) {
-      const timer = setInterval(updateTimer, 1000)
-      return () => clearInterval(timer)
-    }
-  }, [qrSession])
-
-  const loadChildData = async () => {
+  const loadChild = async () => {
     try {
-      const childData = await getChild(childId)
-      setChild(childData)
+      const children = await childrenService.getChildren("")
+      const foundChild = children.find((c) => c.id === childId)
+      setChild(foundChild || null)
     } catch (error) {
       console.error("Error loading child:", error)
       Alert.alert("Erro", "Não foi possível carregar os dados da criança")
-    }
-  }
-
-  const generateQR = async () => {
-    try {
-      setLoading(true)
-      const session = await generateQRSession(childId)
-      setQrSession(session)
-    } catch (error) {
-      console.error("Error generating QR:", error)
-      Alert.alert("Erro", "Não foi possível gerar o QR Code")
     } finally {
       setLoading(false)
     }
   }
 
-  const updateTimer = () => {
-    if (!qrSession) return
+  const handleShare = async () => {
+    if (!child) return
 
-    const now = new Date()
-    const diff = new Date(qrSession.expires_at).getTime() - now.getTime()
-
-    if (diff <= 0) {
-      setTimeLeft("Expirado")
-      return
+    try {
+      await Share.share({
+        message: `QR Code para ${child.name} - Air Jump Monte Carmo\nCódigo: ${child.qr_code}`,
+        title: "QR Code - Air Jump",
+      })
+    } catch (error) {
+      console.error("Error sharing:", error)
     }
-
-    const hours = Math.floor(diff / (1000 * 60 * 60))
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-    const seconds = Math.floor((diff % (1000 * 60)) / 1000)
-
-    setTimeLeft(`${hours}h ${minutes}m ${seconds}s`)
   }
 
-  const renderSafetyAlert = () => {
-    if (!child) return null
-
-    const alerts = []
-
-    if (child.tags.includes("🥸")) {
-      alerts.push({
-        icon: "warning",
-        color: "#F59E0B",
-        title: "Atenção - Menor de 5 anos",
-        message: "Esta criança deve estar acompanhada por um responsável maior de 18 anos durante toda a permanência.",
-      })
-    }
-
-    if (child.has_disability) {
-      alerts.push({
-        icon: "medical",
-        color: "#EF4444",
-        title: "Criança com Deficiência",
-        message:
-          "O responsável deve permanecer na loja durante toda a sessão. Entrada gratuita conforme legislação estadual.",
-      })
-    }
-
-    return alerts.map((alert, index) => (
-      <View key={index} style={[styles.alertCard, { borderLeftColor: alert.color }]}>
-        <View style={styles.alertHeader}>
-          <Ionicons name={alert.icon as any} size={20} color={alert.color} />
-          <Text style={[styles.alertTitle, { color: alert.color }]}>{alert.title}</Text>
-        </View>
-        <Text style={styles.alertMessage}>{alert.message}</Text>
-      </View>
-    ))
-  }
-
-  if (loading || !child || !qrSession) {
+  if (loading) {
     return (
-      <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#3B82F6" />
-        <Text style={styles.loadingText}>Gerando QR Code...</Text>
-      </SafeAreaView>
+      <View style={styles.loadingContainer}>
+        <Text>Carregando...</Text>
+      </View>
+    )
+  }
+
+  if (!child) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Criança não encontrada</Text>
+        <TouchableOpacity style={styles.button} onPress={() => navigation.goBack()}>
+          <Text style={styles.buttonText}>Voltar</Text>
+        </TouchableOpacity>
+      </View>
     )
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
+    <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7}>
-          <Ionicons name="arrow-back" size={24} color="#1f2937" />
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={24} color="#1e293b" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>QR Code de Entrada</Text>
-        <View style={{ width: 24 }} />
+        <Text style={styles.title}>QR Code</Text>
+        <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
+          <Ionicons name="share-outline" size={24} color="#3B82F6" />
+        </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Child Info */}
-        <View style={styles.childCard}>
-          <View style={styles.childAvatar}>
-            <Text style={styles.childInitials}>
-              {child.name
-                .split(" ")
-                .map((n) => n[0])
-                .join("")
-                .substring(0, 2)}
-            </Text>
-          </View>
-
-          <View style={styles.childInfo}>
-            <View style={styles.childNameRow}>
-              <Text style={styles.childName}>{child.name}</Text>
-              <View style={styles.tagsContainer}>
-                {child.tags.map((tag, index) => (
-                  <Text key={index} style={styles.tag}>
-                    {tag}
-                  </Text>
-                ))}
-              </View>
-            </View>
-            <Text style={styles.childAge}>
-              {new Date().getFullYear() - new Date(child.birth_date).getFullYear()} anos
-            </Text>
-            {child.medical_notes && <Text style={styles.medicalNotes}>⚕️ {child.medical_notes}</Text>}
-          </View>
+      <View style={styles.content}>
+        <View style={styles.childInfo}>
+          <Text style={styles.childName}>{child.name}</Text>
+          <Text style={styles.childAge}>{child.age} anos</Text>
+          <Text style={styles.childVisits}>{child.visits} visitas</Text>
         </View>
 
-        {/* QR Code */}
-        <View style={styles.qrCard}>
-          <Text style={styles.qrTitle}>QR Code Dinâmico</Text>
-          <Text style={styles.qrSubtitle}>Apresente este código na entrada</Text>
-
-          <View style={styles.qrContainer}>
-            <QRCode value={qrSession.token} size={200} backgroundColor="white" color="black" />
-          </View>
-
-          <View style={styles.qrInfo}>
-            <Text style={styles.qrToken}>{qrSession.token}</Text>
-            <View style={styles.timerContainer}>
-              <Ionicons name="time" size={16} color="#6B7280" />
-              <Text style={styles.timerText}>Expira em: {timeLeft}</Text>
-            </View>
-          </View>
-
-          <TouchableOpacity style={styles.refreshButton} onPress={generateQR} activeOpacity={0.8}>
-            <Ionicons name="refresh" size={16} color="#3B82F6" />
-            <Text style={styles.refreshButtonText}>Renovar QR Code</Text>
-          </TouchableOpacity>
+        <View style={styles.qrContainer}>
+          <QRCode value={child.qr_code} size={200} backgroundColor="white" color="black" />
         </View>
 
-        {/* Safety Alerts */}
-        {renderSafetyAlert()}
+        <View style={styles.instructions}>
+          <Text style={styles.instructionsTitle}>Como usar:</Text>
+          <Text style={styles.instructionsText}>• Apresente este QR Code na entrada do parque</Text>
+          <Text style={styles.instructionsText}>• O código é válido por 24 horas</Text>
+          <Text style={styles.instructionsText}>• Mantenha o celular com bateria</Text>
+        </View>
 
-        {/* Instructions */}
-        <View style={styles.instructionsCard}>
-          <Text style={styles.instructionsTitle}>Como usar</Text>
-          <View style={styles.instructionsList}>
-            <View style={styles.instructionItem}>
-              <View style={styles.instructionNumber}>
-                <Text style={styles.instructionNumberText}>1</Text>
-              </View>
-              <Text style={styles.instructionText}>Apresente este QR Code na recepção</Text>
-            </View>
-
-            <View style={styles.instructionItem}>
-              <View style={styles.instructionNumber}>
-                <Text style={styles.instructionNumberText}>2</Text>
-              </View>
-              <Text style={styles.instructionText}>Nossa equipe validará as informações de segurança</Text>
-            </View>
-
-            <View style={styles.instructionItem}>
-              <View style={styles.instructionNumber}>
-                <Text style={styles.instructionNumberText}>3</Text>
-              </View>
-              <Text style={styles.instructionText}>O tempo de sessão será iniciado automaticamente</Text>
-            </View>
-
-            <View style={styles.instructionItem}>
-              <View style={styles.instructionNumber}>
-                <Text style={styles.instructionNumberText}>4</Text>
-              </View>
-              <Text style={styles.instructionText}>Use o mesmo QR Code para a retirada segura</Text>
-            </View>
+        <View style={styles.emergencyInfo}>
+          <Ionicons name="medical" size={20} color="#ef4444" />
+          <View style={styles.emergencyText}>
+            <Text style={styles.emergencyTitle}>Contato de Emergência:</Text>
+            <Text style={styles.emergencyContact}>{child.emergency_contact}</Text>
+            {child.medical_info && <Text style={styles.medicalInfo}>{child.medical_info}</Text>}
           </View>
         </View>
-      </ScrollView>
-    </SafeAreaView>
+      </View>
+    </View>
   )
 }
 
@@ -244,227 +115,132 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#f8fafc",
   },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: "#6B7280",
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 18,
+    color: "#ef4444",
+    marginBottom: 20,
   },
   header: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    justifyContent: "space-between",
     padding: 20,
-    backgroundColor: "white",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
+    paddingTop: 60,
+    backgroundColor: "#fff",
   },
-  headerTitle: {
-    fontSize: 18,
+  backButton: {
+    padding: 8,
+  },
+  title: {
+    fontSize: 20,
     fontWeight: "bold",
-    color: "#1f2937",
+    color: "#1e293b",
+  },
+  shareButton: {
+    padding: 8,
   },
   content: {
     flex: 1,
-    padding: 16,
-  },
-  childCard: {
-    backgroundColor: "white",
-    padding: 16,
-    borderRadius: 12,
-    flexDirection: "row",
+    padding: 20,
     alignItems: "center",
-    marginBottom: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  childAvatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "#3B82F6",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 16,
-  },
-  childInitials: {
-    color: "white",
-    fontSize: 20,
-    fontWeight: "bold",
   },
   childInfo: {
-    flex: 1,
-  },
-  childNameRow: {
-    flexDirection: "row",
     alignItems: "center",
-    marginBottom: 4,
+    marginBottom: 40,
   },
   childName: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#1f2937",
-    marginRight: 8,
-  },
-  tagsContainer: {
-    flexDirection: "row",
-  },
-  tag: {
-    fontSize: 16,
-    marginRight: 4,
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#1e293b",
   },
   childAge: {
+    fontSize: 16,
+    color: "#64748b",
+    marginTop: 4,
+  },
+  childVisits: {
     fontSize: 14,
-    color: "#6b7280",
-    marginBottom: 4,
+    color: "#3B82F6",
+    marginTop: 8,
   },
-  medicalNotes: {
-    fontSize: 12,
-    color: "#F59E0B",
-    backgroundColor: "#FEF3C7",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  qrCard: {
-    backgroundColor: "white",
-    padding: 24,
+  qrContainer: {
+    backgroundColor: "#fff",
+    padding: 20,
     borderRadius: 12,
-    alignItems: "center",
-    marginBottom: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowRadius: 4,
+    elevation: 3,
+    marginBottom: 40,
   },
-  qrTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#1f2937",
-    marginBottom: 4,
-  },
-  qrSubtitle: {
-    fontSize: 14,
-    color: "#6b7280",
-    marginBottom: 24,
-  },
-  qrContainer: {
-    padding: 16,
-    backgroundColor: "white",
+  instructions: {
+    backgroundColor: "#fff",
+    padding: 20,
     borderRadius: 12,
-    borderWidth: 2,
-    borderColor: "#e5e7eb",
-    marginBottom: 16,
-  },
-  qrInfo: {
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  qrToken: {
-    fontSize: 12,
-    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
-    backgroundColor: "#f3f4f6",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
-    marginBottom: 8,
-  },
-  timerContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  timerText: {
-    fontSize: 14,
-    color: "#6B7280",
-    marginLeft: 4,
-  },
-  refreshButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: "#3B82F6",
-    borderRadius: 6,
-  },
-  refreshButtonText: {
-    color: "#3B82F6",
-    fontSize: 14,
-    marginLeft: 4,
-  },
-  alertCard: {
-    backgroundColor: "white",
-    padding: 16,
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    marginBottom: 16,
+    width: "100%",
+    marginBottom: 20,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  alertHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  alertTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginLeft: 8,
-  },
-  alertMessage: {
-    fontSize: 12,
-    color: "#6B7280",
-    lineHeight: 16,
-  },
-  instructionsCard: {
-    backgroundColor: "white",
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   instructionsTitle: {
     fontSize: 16,
-    fontWeight: "bold",
-    color: "#1f2937",
-    marginBottom: 16,
+    fontWeight: "600",
+    color: "#1e293b",
+    marginBottom: 12,
   },
-  instructionsList: {
-    gap: 12,
+  instructionsText: {
+    fontSize: 14,
+    color: "#64748b",
+    marginBottom: 4,
   },
-  instructionItem: {
+  emergencyInfo: {
+    backgroundColor: "#fef2f2",
+    padding: 16,
+    borderRadius: 8,
     flexDirection: "row",
     alignItems: "flex-start",
+    width: "100%",
   },
-  instructionNumber: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "#DBEAFE",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  instructionNumberText: {
-    fontSize: 12,
-    fontWeight: "bold",
-    color: "#1D4ED8",
-  },
-  instructionText: {
+  emergencyText: {
     flex: 1,
+    marginLeft: 12,
+  },
+  emergencyTitle: {
     fontSize: 14,
-    color: "#6B7280",
-    lineHeight: 20,
+    fontWeight: "600",
+    color: "#dc2626",
+    marginBottom: 4,
+  },
+  emergencyContact: {
+    fontSize: 14,
+    color: "#dc2626",
+    marginBottom: 4,
+  },
+  medicalInfo: {
+    fontSize: 12,
+    color: "#dc2626",
+    fontStyle: "italic",
+  },
+  button: {
+    backgroundColor: "#3B82F6",
+    padding: 16,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  buttonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
 })

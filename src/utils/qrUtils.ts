@@ -1,44 +1,45 @@
-import CryptoJS from "crypto-js"
+import { Buffer } from "buffer"
 
-export const generateQRToken = (childId: string): string => {
+export const generateQRCode = (childId: string, childName: string): string => {
   const timestamp = Date.now()
-  const randomString = Math.random().toString(36).substring(2, 15)
-  const data = `${childId}-${timestamp}-${randomString}`
+  const expirationTime = timestamp + 24 * 60 * 60 * 1000 // 24 hours
 
-  // Encrypt the data
-  const encrypted = CryptoJS.AES.encrypt(data, "air-jump-secret-key").toString()
-
-  // Create a shorter, URL-safe token
-  const token = CryptoJS.SHA256(encrypted).toString().substring(0, 16)
-
-  return `AJ-${token.toUpperCase()}`
-}
-
-export const validateQRTokenFormat = (token: string): boolean => {
-  const qrRegex = /^AJ-[A-F0-9]{16}$/
-  return qrRegex.test(token)
-}
-
-export const calculateAge = (birthDate: Date): number => {
-  const today = new Date()
-  const birth = new Date(birthDate)
-  let age = today.getFullYear() - birth.getFullYear()
-  const monthDiff = today.getMonth() - birth.getMonth()
-
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-    age--
+  const qrData = {
+    childId,
+    childName,
+    timestamp,
+    expirationTime,
+    venue: "Air Jump Monte Carmo",
   }
 
-  return age
+  // Create a simple encoded string
+  const encoded = Buffer.from(JSON.stringify(qrData)).toString("base64")
+  return `AIRJUMP_${encoded}`
 }
 
-export const generateChildTags = (birthDate: Date, hasDisability: boolean): string[] => {
-  const age = calculateAge(birthDate)
-  const tags: string[] = []
+export const decodeQRCode = (qrCode: string): any | null => {
+  try {
+    if (!qrCode.startsWith("AIRJUMP_")) {
+      return null
+    }
 
-  if (hasDisability) tags.push("⚠️")
-  if (age < 5) tags.push("🥸")
-  if (age < 18) tags.push("👦")
+    const encoded = qrCode.replace("AIRJUMP_", "")
+    const decoded = Buffer.from(encoded, "base64").toString("utf-8")
+    const qrData = JSON.parse(decoded)
 
-  return tags
+    // Check if QR code is expired
+    if (Date.now() > qrData.expirationTime) {
+      return { ...qrData, expired: true }
+    }
+
+    return { ...qrData, expired: false }
+  } catch (error) {
+    console.error("Error decoding QR code:", error)
+    return null
+  }
+}
+
+export const isQRCodeValid = (qrCode: string): boolean => {
+  const decoded = decodeQRCode(qrCode)
+  return decoded && !decoded.expired
 }

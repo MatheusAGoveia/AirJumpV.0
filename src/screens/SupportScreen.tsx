@@ -1,189 +1,274 @@
 "use client"
 
-import { useState } from "react"
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, SafeAreaView } from "react-native"
+import { useState, useEffect } from "react"
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, Linking } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { Picker } from "@react-native-picker/picker"
-import * as Linking from "expo-linking"
-import { createSupportTicket } from "../services/supabaseService"
+import { supabase } from "../lib/supabase"
+import { supportService } from "../services/supabaseService"
+import type { Database } from "../lib/database.types"
 
-interface SupportScreenProps {
-  navigation: any
-}
+type SupportTicket = Database["public"]["Tables"]["support_tickets"]["Row"]
 
-export default function SupportScreen({ navigation }: SupportScreenProps) {
-  const [ticketType, setTicketType] = useState<"doubt" | "suggestion" | "complaint" | "">("")
+const PRIORITY_OPTIONS = [
+  { value: "low", label: "Baixa", color: "#10B981" },
+  { value: "medium", label: "Média", color: "#F59E0B" },
+  { value: "high", label: "Alta", color: "#EF4444" },
+]
+
+export default function SupportScreen({ navigation }: any) {
+  const [tickets, setTickets] = useState<SupportTicket[]>([])
   const [subject, setSubject] = useState("")
-  const [description, setDescription] = useState("")
+  const [message, setMessage] = useState("")
+  const [priority, setPriority] = useState<"low" | "medium" | "high">("medium")
   const [loading, setLoading] = useState(false)
+  const [showForm, setShowForm] = useState(false)
 
-  const handleSubmit = async () => {
-    if (!ticketType || !subject || !description) {
-      Alert.alert("Erro", "Preencha todos os campos")
+  useEffect(() => {
+    loadTickets()
+  }, [])
+
+  const loadTickets = async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) return
+
+      const ticketsData = await supportService.getTickets(user.id)
+      setTickets(ticketsData)
+    } catch (error) {
+      console.error("Error loading tickets:", error)
+    }
+  }
+
+  const handleCreateTicket = async () => {
+    if (!subject.trim() || !message.trim()) {
+      Alert.alert("Erro", "Por favor, preencha todos os campos")
       return
     }
 
     setLoading(true)
 
     try {
-      await createSupportTicket({
-        type: ticketType as "doubt" | "suggestion" | "complaint",
-        subject: subject.trim(),
-        description: description.trim(),
-      })
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) throw new Error("Usuário não encontrado")
 
-      Alert.alert("Sucesso", "Chamado enviado com sucesso! Nossa equipe entrará em contato em breve.", [
-        { text: "OK", onPress: () => navigation.goBack() },
-      ])
-    } catch (error) {
-      console.error("Error creating support ticket:", error)
-      Alert.alert("Erro", "Não foi possível enviar o chamado")
+      const ticketData = {
+        parent_id: user.id,
+        subject: subject.trim(),
+        message: message.trim(),
+        priority,
+        status: "open" as const,
+      }
+
+      const newTicket = await supportService.createTicket(ticketData)
+
+      if (newTicket) {
+        Alert.alert("Sucesso!", "Ticket criado com sucesso! Nossa equipe entrará em contato em breve.")
+        setSubject("")
+        setMessage("")
+        setPriority("medium")
+        setShowForm(false)
+        loadTickets()
+      } else {
+        throw new Error("Erro ao criar ticket")
+      }
+    } catch (error: any) {
+      Alert.alert("Erro", error.message)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleWhatsApp = () => {
-    const phoneNumber = "5511999999999"
-    const message = "Olá! Gostaria de falar sobre o Air Jump Monte Carmo."
-    const url = `whatsapp://send?phone=${phoneNumber}&text=${encodeURIComponent(message)}`
-
-    Linking.canOpenURL(url)
-      .then((supported) => {
-        if (supported) {
-          return Linking.openURL(url)
-        } else {
-          Alert.alert("Erro", "WhatsApp não está instalado")
-        }
-      })
-      .catch((err) => console.error("Error opening WhatsApp:", err))
+  const handleCall = () => {
+    Linking.openURL("tel:+5511999999999")
   }
 
-  const handleCall = () => {
-    const phoneNumber = "tel:+551133333333"
-    Linking.openURL(phoneNumber)
+  const handleWhatsApp = () => {
+    Linking.openURL("https://wa.me/5511999999999?text=Olá! Preciso de ajuda com o Air Jump.")
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "open":
+        return "#EF4444"
+      case "in_progress":
+        return "#F59E0B"
+      case "resolved":
+        return "#10B981"
+      default:
+        return "#64748b"
+    }
+  }
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case "open":
+        return "Aberto"
+      case "in_progress":
+        return "Em Andamento"
+      case "resolved":
+        return "Resolvido"
+      default:
+        return status
+    }
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
+    <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7}>
-          <Ionicons name="arrow-back" size={24} color="#1f2937" />
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={24} color="#1e293b" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Fale Conosco</Text>
-        <View style={{ width: 24 }} />
+        <Text style={styles.title}>Suporte</Text>
+        <TouchableOpacity style={styles.addButton} onPress={() => setShowForm(!showForm)}>
+          <Ionicons name={showForm ? "close" : "add"} size={24} color="#3B82F6" />
+        </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Quick Actions */}
-        <View style={styles.quickActions}>
-          <TouchableOpacity style={[styles.quickActionCard, { borderColor: "#3B82F6" }]} activeOpacity={0.8}>
-            <Ionicons name="help-circle" size={24} color="#3B82F6" />
-            <Text style={[styles.quickActionText, { color: "#3B82F6" }]}>Dúvida</Text>
+      {/* Quick Contact */}
+      <View style={styles.quickContact}>
+        <Text style={styles.sectionTitle}>Contato Rápido</Text>
+        <View style={styles.contactButtons}>
+          <TouchableOpacity style={styles.contactButton} onPress={handleCall}>
+            <Ionicons name="call" size={24} color="#10B981" />
+            <Text style={styles.contactText}>Ligar</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity style={[styles.quickActionCard, { borderColor: "#10B981" }]} activeOpacity={0.8}>
-            <Ionicons name="bulb" size={24} color="#10B981" />
-            <Text style={[styles.quickActionText, { color: "#10B981" }]}>Sugestão</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={[styles.quickActionCard, { borderColor: "#EF4444" }]} activeOpacity={0.8}>
-            <Ionicons name="warning" size={24} color="#EF4444" />
-            <Text style={[styles.quickActionText, { color: "#EF4444" }]}>Reclamação</Text>
+          <TouchableOpacity style={styles.contactButton} onPress={handleWhatsApp}>
+            <Ionicons name="logo-whatsapp" size={24} color="#25D366" />
+            <Text style={styles.contactText}>WhatsApp</Text>
           </TouchableOpacity>
         </View>
+      </View>
 
-        {/* Support Form */}
+      {/* New Ticket Form */}
+      {showForm && (
         <View style={styles.form}>
-          <View style={styles.formHeader}>
-            <Ionicons name="chatbubble" size={20} color="#3B82F6" />
-            <Text style={styles.formTitle}>Abrir Chamado</Text>
-          </View>
-          <Text style={styles.formSubtitle}>Nossa equipe está pronta para ajudar você</Text>
+          <Text style={styles.sectionTitle}>Novo Ticket</Text>
 
-          {/* Tipo do Chamado */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Tipo do Chamado *</Text>
+            <Text style={styles.label}>Assunto</Text>
+            <TextInput
+              style={styles.input}
+              value={subject}
+              onChangeText={setSubject}
+              placeholder="Descreva brevemente o problema"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Prioridade</Text>
             <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={ticketType}
-                onValueChange={(itemValue) => setTicketType(itemValue)}
-                style={styles.picker}
-              >
-                <Picker.Item label="Selecione o tipo" value="" />
-                <Picker.Item label="Dúvida" value="doubt" />
-                <Picker.Item label="Sugestão" value="suggestion" />
-                <Picker.Item label="Reclamação" value="complaint" />
+              <Picker selectedValue={priority} onValueChange={setPriority} style={styles.picker}>
+                {PRIORITY_OPTIONS.map((option) => (
+                  <Picker.Item key={option.value} label={option.label} value={option.value} />
+                ))}
               </Picker>
             </View>
           </View>
 
-          {/* Assunto */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Assunto *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Resumo do seu chamado"
-              value={subject}
-              onChangeText={setSubject}
-              placeholderTextColor="#9CA3AF"
-            />
-          </View>
-
-          {/* Descrição */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Descrição *</Text>
+            <Text style={styles.label}>Mensagem</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
-              placeholder="Descreva detalhadamente sua dúvida, sugestão ou reclamação..."
-              value={description}
-              onChangeText={setDescription}
+              value={message}
+              onChangeText={setMessage}
+              placeholder="Descreva detalhadamente o problema ou dúvida..."
               multiline
               numberOfLines={4}
               textAlignVertical="top"
-              placeholderTextColor="#9CA3AF"
             />
           </View>
 
           <TouchableOpacity
-            style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-            onPress={handleSubmit}
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleCreateTicket}
             disabled={loading}
-            activeOpacity={0.8}
           >
-            <Text style={styles.submitButtonText}>{loading ? "Enviando Chamado..." : "Enviar Chamado"}</Text>
-          </TouchableOpacity>
-
-          <Text style={styles.disclaimer}>Você receberá uma resposta via app e WhatsApp em até 24 horas.</Text>
-        </View>
-
-        {/* Direct Contact */}
-        <View style={styles.contactCard}>
-          <Text style={styles.contactTitle}>Contato Direto</Text>
-
-          <TouchableOpacity style={styles.contactItem} onPress={handleWhatsApp} activeOpacity={0.8}>
-            <View style={styles.contactInfo}>
-              <Text style={styles.contactLabel}>WhatsApp</Text>
-              <Text style={styles.contactValue}>(11) 99999-9999</Text>
-            </View>
-            <View style={[styles.contactButton, { backgroundColor: "#10B981" }]}>
-              <Text style={styles.contactButtonText}>Conversar</Text>
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.contactItem} onPress={handleCall} activeOpacity={0.8}>
-            <View style={styles.contactInfo}>
-              <Text style={styles.contactLabel}>Telefone</Text>
-              <Text style={styles.contactValue}>(11) 3333-3333</Text>
-            </View>
-            <View style={[styles.contactButton, { backgroundColor: "white", borderWidth: 1, borderColor: "#3B82F6" }]}>
-              <Text style={[styles.contactButtonText, { color: "#3B82F6" }]}>Ligar</Text>
-            </View>
+            <Text style={styles.buttonText}>{loading ? "Criando..." : "Criar Ticket"}</Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
-    </SafeAreaView>
+      )}
+
+      {/* Tickets List */}
+      <View style={styles.ticketsList}>
+        <Text style={styles.sectionTitle}>Meus Tickets</Text>
+        {tickets.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="chatbubble-outline" size={48} color="#9CA3AF" />
+            <Text style={styles.emptyText}>Nenhum ticket encontrado</Text>
+            <Text style={styles.emptySubtext}>Crie um ticket para receber suporte da nossa equipe</Text>
+          </View>
+        ) : (
+          tickets.map((ticket) => (
+            <View key={ticket.id} style={styles.ticketCard}>
+              <View style={styles.ticketHeader}>
+                <Text style={styles.ticketSubject}>{ticket.subject}</Text>
+                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(ticket.status) }]}>
+                  <Text style={styles.statusText}>{getStatusText(ticket.status)}</Text>
+                </View>
+              </View>
+              <Text style={styles.ticketMessage} numberOfLines={2}>
+                {ticket.message}
+              </Text>
+              <View style={styles.ticketFooter}>
+                <View
+                  style={[
+                    styles.priorityBadge,
+                    {
+                      backgroundColor: PRIORITY_OPTIONS.find((p) => p.value === ticket.priority)?.color + "20",
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.priorityText,
+                      {
+                        color: PRIORITY_OPTIONS.find((p) => p.value === ticket.priority)?.color,
+                      },
+                    ]}
+                  >
+                    {PRIORITY_OPTIONS.find((p) => p.value === ticket.priority)?.label}
+                  </Text>
+                </View>
+                <Text style={styles.ticketDate}>{new Date(ticket.created_at).toLocaleDateString("pt-BR")}</Text>
+              </View>
+            </View>
+          ))
+        )}
+      </View>
+
+      {/* FAQ */}
+      <View style={styles.faq}>
+        <Text style={styles.sectionTitle}>Perguntas Frequentes</Text>
+
+        <View style={styles.faqItem}>
+          <Text style={styles.faqQuestion}>Como funciona o QR Code?</Text>
+          <Text style={styles.faqAnswer}>
+            Cada criança recebe um QR Code único que deve ser apresentado na entrada. O código é válido por 24 horas e
+            permite entrada e saída rápida.
+          </Text>
+        </View>
+
+        <View style={styles.faqItem}>
+          <Text style={styles.faqQuestion}>Posso cancelar uma festa?</Text>
+          <Text style={styles.faqAnswer}>
+            Sim, cancelamentos podem ser feitos até 48 horas antes da data agendada sem cobrança de taxa.
+          </Text>
+        </View>
+
+        <View style={styles.faqItem}>
+          <Text style={styles.faqQuestion}>Como funciona o programa de fidelidade?</Text>
+          <Text style={styles.faqAnswer}>
+            A cada visita, a criança acumula pontos. Ao atingir certos níveis, recebe benefícios como descontos e
+            brindes especiais.
+          </Text>
+        </View>
+      </View>
+    </ScrollView>
   )
 }
 
@@ -194,168 +279,217 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    justifyContent: "space-between",
     padding: 20,
-    backgroundColor: "white",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
+    paddingTop: 60,
+    backgroundColor: "#fff",
   },
-  headerTitle: {
+  backButton: {
+    padding: 8,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#1e293b",
+  },
+  addButton: {
+    padding: 8,
+  },
+  quickContact: {
+    margin: 20,
+  },
+  sectionTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#1f2937",
+    color: "#1e293b",
+    marginBottom: 16,
   },
-  content: {
-    flex: 1,
-  },
-  quickActions: {
+  contactButtons: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    margin: 16,
-    gap: 8,
+    justifyContent: "space-around",
   },
-  quickActionCard: {
-    flex: 1,
-    backgroundColor: "white",
+  contactButton: {
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 12,
     alignItems: "center",
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 2,
+    flex: 1,
+    marginHorizontal: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  quickActionText: {
-    fontSize: 12,
+  contactText: {
+    fontSize: 14,
     fontWeight: "600",
-    marginTop: 4,
+    color: "#1e293b",
+    marginTop: 8,
   },
   form: {
-    backgroundColor: "white",
-    margin: 16,
+    backgroundColor: "#fff",
+    margin: 20,
     padding: 20,
     borderRadius: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  formHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 4,
-  },
-  formTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#1f2937",
-    marginLeft: 8,
-  },
-  formSubtitle: {
-    fontSize: 14,
-    color: "#6b7280",
-    marginBottom: 24,
+    shadowRadius: 4,
+    elevation: 3,
   },
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   label: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#374151",
+    color: "#1e293b",
     marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderColor: "#d1d5db",
+    borderColor: "#e2e8f0",
     borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    padding: 12,
     fontSize: 16,
-    backgroundColor: "white",
-    color: "#1f2937",
+    backgroundColor: "#fff",
   },
   textArea: {
     height: 100,
-    textAlignVertical: "top",
+    paddingTop: 12,
   },
   pickerContainer: {
     borderWidth: 1,
-    borderColor: "#d1d5db",
+    borderColor: "#e2e8f0",
     borderRadius: 8,
-    backgroundColor: "white",
+    backgroundColor: "#fff",
   },
   picker: {
     height: 50,
   },
-  submitButton: {
+  button: {
     backgroundColor: "#3B82F6",
+    padding: 16,
     borderRadius: 8,
-    paddingVertical: 16,
     alignItems: "center",
-    marginBottom: 12,
   },
-  submitButtonDisabled: {
+  buttonDisabled: {
     opacity: 0.6,
   },
-  submitButtonText: {
-    color: "white",
+  buttonText: {
+    color: "#fff",
     fontSize: 16,
     fontWeight: "600",
   },
-  disclaimer: {
-    fontSize: 12,
-    color: "#6b7280",
-    textAlign: "center",
-    lineHeight: 16,
+  ticketsList: {
+    margin: 20,
   },
-  contactCard: {
-    backgroundColor: "white",
-    margin: 16,
-    padding: 20,
+  emptyState: {
+    backgroundColor: "#fff",
+    padding: 40,
     borderRadius: 12,
+    alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  contactTitle: {
+  emptyText: {
     fontSize: 16,
-    fontWeight: "bold",
-    color: "#1f2937",
-    marginBottom: 16,
+    color: "#64748b",
+    marginTop: 12,
   },
-  contactItem: {
+  emptySubtext: {
+    fontSize: 14,
+    color: "#9CA3AF",
+    marginTop: 4,
+    textAlign: "center",
+  },
+  ticketCard: {
+    backgroundColor: "#fff",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  ticketHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: "#F9FAFB",
-    borderRadius: 8,
-    marginBottom: 12,
+    marginBottom: 8,
   },
-  contactInfo: {
+  ticketSubject: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#1e293b",
     flex: 1,
   },
-  contactLabel: {
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 8,
+  },
+  statusText: {
+    fontSize: 12,
+    color: "#fff",
+    fontWeight: "600",
+  },
+  ticketMessage: {
+    fontSize: 14,
+    color: "#64748b",
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  ticketFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  priorityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  priorityText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  ticketDate: {
+    fontSize: 12,
+    color: "#9CA3AF",
+  },
+  faq: {
+    margin: 20,
+    marginBottom: 40,
+  },
+  faqItem: {
+    backgroundColor: "#fff",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  faqQuestion: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#1f2937",
+    color: "#1e293b",
+    marginBottom: 8,
   },
-  contactValue: {
-    fontSize: 12,
-    color: "#6b7280",
-    marginTop: 2,
-  },
-  contactButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-  },
-  contactButtonText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "white",
+  faqAnswer: {
+    fontSize: 14,
+    color: "#64748b",
+    lineHeight: 20,
   },
 })

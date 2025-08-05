@@ -1,343 +1,257 @@
 import { supabase } from "../lib/supabase"
-import { generateQRToken, generateChildTags } from "../utils/qrUtils"
 import type { Database } from "../lib/database.types"
 
-type Tables = Database["public"]["Tables"]
-type Child = Tables["children"]["Row"]
-type QRSession = Tables["qr_sessions"]["Row"]
-type LoyaltyProgram = Tables["loyalty_programs"]["Row"]
-type PartyBooking = Tables["party_bookings"]["Row"]
-type SupportTicket = Tables["support_tickets"]["Row"]
-type EmergencyAlert = Tables["emergency_alerts"]["Row"]
+type Profile = Database["public"]["Tables"]["profiles"]["Row"]
+type Child = Database["public"]["Tables"]["children"]["Row"]
+type Visit = Database["public"]["Tables"]["visits"]["Row"]
+type Party = Database["public"]["Tables"]["parties"]["Row"]
+type SupportTicket = Database["public"]["Tables"]["support_tickets"]["Row"]
 
-// Auth Services
-export const signUp = async (email: string, password: string, fullName: string, phone?: string) => {
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
-        full_name: fullName,
-        phone: phone || null,
-      },
-    },
-  })
+// Profile Services
+export const profileService = {
+  async getProfile(userId: string): Promise<Profile | null> {
+    const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single()
 
-  if (error) throw error
-  return data
-}
+    if (error) {
+      console.error("Error fetching profile:", error)
+      return null
+    }
+    return data
+  },
 
-export const signIn = async (email: string, password: string) => {
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  })
+  async updateProfile(userId: string, updates: Partial<Profile>): Promise<boolean> {
+    const { error } = await supabase
+      .from("profiles")
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq("id", userId)
 
-  if (error) throw error
-  return data
-}
-
-export const signOut = async () => {
-  const { error } = await supabase.auth.signOut()
-  if (error) throw error
-}
-
-export const getCurrentUser = async () => {
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-  if (error) throw error
-  return user
+    if (error) {
+      console.error("Error updating profile:", error)
+      return false
+    }
+    return true
+  },
 }
 
 // Children Services
-export const addChild = async (childData: {
-  name: string
-  birthDate: Date
-  medicalNotes?: string
-  hasDisability: boolean
-  photoUrl?: string
-  disabilityDocumentUrl?: string
-}) => {
-  const user = await getCurrentUser()
-  if (!user) throw new Error("User not authenticated")
+export const childrenService = {
+  async getChildren(parentId: string): Promise<Child[]> {
+    const { data, error } = await supabase
+      .from("children")
+      .select("*")
+      .eq("parent_id", parentId)
+      .order("created_at", { ascending: false })
 
-  const tags = generateChildTags(childData.birthDate, childData.hasDisability)
+    if (error) {
+      console.error("Error fetching children:", error)
+      return []
+    }
+    return data || []
+  },
 
-  const { data, error } = await supabase
-    .from("children")
-    .insert({
-      parent_id: user.id,
-      name: childData.name,
-      birth_date: childData.birthDate.toISOString().split("T")[0],
-      medical_notes: childData.medicalNotes || null,
-      has_disability: childData.hasDisability,
-      photo_url: childData.photoUrl || null,
-      disability_document_url: childData.disabilityDocumentUrl || null,
-      tags,
-    })
-    .select()
-    .single()
+  async addChild(childData: Omit<Child, "id" | "created_at" | "updated_at" | "visits">): Promise<Child | null> {
+    const { data, error } = await supabase.from("children").insert([childData]).select().single()
 
-  if (error) throw error
-  return data
+    if (error) {
+      console.error("Error adding child:", error)
+      return null
+    }
+    return data
+  },
+
+  async getChildByQR(qrCode: string): Promise<Child | null> {
+    const { data, error } = await supabase.from("children").select("*").eq("qr_code", qrCode).single()
+
+    if (error) {
+      console.error("Error fetching child by QR:", error)
+      return null
+    }
+    return data
+  },
+
+  async updateVisits(childId: string, visits: number): Promise<boolean> {
+    const { error } = await supabase
+      .from("children")
+      .update({ visits, updated_at: new Date().toISOString() })
+      .eq("id", childId)
+
+    if (error) {
+      console.error("Error updating visits:", error)
+      return false
+    }
+    return true
+  },
 }
 
-export const getChildren = async (): Promise<Child[]> => {
-  const user = await getCurrentUser()
-  if (!user) throw new Error("User not authenticated")
-
-  const { data, error } = await supabase
-    .from("children")
-    .select("*")
-    .eq("parent_id", user.id)
-    .order("created_at", { ascending: false })
-
-  if (error) throw error
-  return data || []
-}
-
-export const getChild = async (childId: string): Promise<Child> => {
-  const { data, error } = await supabase.from("children").select("*").eq("id", childId).single()
-
-  if (error) throw error
-  return data
-}
-
-// QR Session Services
-export const generateQRSession = async (childId: string): Promise<QRSession> => {
-  const token = generateQRToken(childId)
-  const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000) // 2 hours
-
-  const { data, error } = await supabase
-    .from("qr_sessions")
-    .insert({
-      child_id: childId,
-      token,
-      expires_at: expiresAt.toISOString(),
-    })
-    .select()
-    .single()
-
-  if (error) throw error
-  return data
-}
-
-export const validateQRToken = async (
-  token: string,
-): Promise<{
-  valid: boolean
-  session?: QRSession
-  child?: Child
-}> => {
-  const { data: session, error } = await supabase.from("qr_sessions").select("*").eq("token", token).single()
-
-  if (error || !session) {
-    return { valid: false }
-  }
-
-  // Check if expired
-  if (new Date(session.expires_at) < new Date()) {
-    return { valid: false }
-  }
-
-  // Get child data
-  const child = await getChild(session.child_id)
-
-  return { valid: true, session, child }
-}
-
-export const checkInChild = async (sessionId: string): Promise<void> => {
-  const { error } = await supabase
-    .from("qr_sessions")
-    .update({
-      is_active: true,
-      entry_time: new Date().toISOString(),
-    })
-    .eq("id", sessionId)
-
-  if (error) throw error
-}
-
-export const checkOutChild = async (sessionId: string): Promise<void> => {
-  const { error } = await supabase
-    .from("qr_sessions")
-    .update({
-      is_active: false,
-      exit_time: new Date().toISOString(),
-    })
-    .eq("id", sessionId)
-
-  if (error) throw error
-
-  // Add loyalty seal
-  await addLoyaltySeal()
-}
-
-export const getActiveQRSessions = async (): Promise<Array<{ session: QRSession; child: Child }>> => {
-  const { data: sessions, error } = await supabase
-    .from("qr_sessions")
-    .select(`
-      *,
-      children (*)
-    `)
-    .eq("is_active", true)
-
-  if (error) throw error
-
-  return (sessions || []).map((session) => ({
-    session: {
-      id: session.id,
-      child_id: session.child_id,
-      token: session.token,
-      is_active: session.is_active,
-      entry_time: session.entry_time,
-      exit_time: session.exit_time,
-      expires_at: session.expires_at,
-      created_at: session.created_at,
-    },
-    child: (session as any).children,
-  }))
-}
-
-// Loyalty Program Services
-export const getLoyaltyProgram = async (): Promise<LoyaltyProgram> => {
-  const user = await getCurrentUser()
-  if (!user) throw new Error("User not authenticated")
-
-  const { data, error } = await supabase.from("loyalty_programs").select("*").eq("parent_id", user.id).single()
-
-  if (error && error.code === "PGRST116") {
-    // No loyalty program found, create one
-    const { data: newProgram, error: insertError } = await supabase
-      .from("loyalty_programs")
-      .insert({
-        parent_id: user.id,
-        seals: 0,
-        free_entries: 0,
-      })
+// Visit Services
+export const visitService = {
+  async checkIn(childId: string): Promise<Visit | null> {
+    const { data, error } = await supabase
+      .from("visits")
+      .insert([
+        {
+          child_id: childId,
+          entry_time: new Date().toISOString(),
+        },
+      ])
       .select()
       .single()
 
-    if (insertError) throw insertError
-    return newProgram
-  }
+    if (error) {
+      console.error("Error checking in:", error)
+      return null
+    }
+    return data
+  },
 
-  if (error) throw error
-  return data
+  async checkOut(visitId: string): Promise<boolean> {
+    const { error } = await supabase.from("visits").update({ exit_time: new Date().toISOString() }).eq("id", visitId)
+
+    if (error) {
+      console.error("Error checking out:", error)
+      return false
+    }
+    return true
+  },
+
+  async getActiveVisit(childId: string): Promise<Visit | null> {
+    const { data, error } = await supabase
+      .from("visits")
+      .select("*")
+      .eq("child_id", childId)
+      .is("exit_time", null)
+      .order("entry_time", { ascending: false })
+      .limit(1)
+      .single()
+
+    if (error) {
+      return null
+    }
+    return data
+  },
 }
 
-export const addLoyaltySeal = async (): Promise<void> => {
-  const loyalty = await getLoyaltyProgram()
-  const newSeals = loyalty.seals + 1
-  const newFreeEntries = loyalty.free_entries + Math.floor(newSeals / 10)
+// Party Services
+export const partyService = {
+  async getParties(parentId: string): Promise<Party[]> {
+    const { data, error } = await supabase
+      .from("parties")
+      .select("*")
+      .eq("parent_id", parentId)
+      .order("date", { ascending: true })
 
-  const { error } = await supabase
-    .from("loyalty_programs")
-    .update({
-      seals: newSeals % 10,
-      free_entries: newFreeEntries,
-      last_updated: new Date().toISOString(),
-    })
-    .eq("id", loyalty.id)
+    if (error) {
+      console.error("Error fetching parties:", error)
+      return []
+    }
+    return data || []
+  },
 
-  if (error) throw error
+  async bookParty(partyData: Omit<Party, "id" | "created_at" | "updated_at">): Promise<Party | null> {
+    const { data, error } = await supabase.from("parties").insert([partyData]).select().single()
+
+    if (error) {
+      console.error("Error booking party:", error)
+      return null
+    }
+    return data
+  },
 }
 
-// Party Booking Services
-export const createPartyBooking = async (bookingData: {
-  childName: string
-  date: Date
-  time: string
-  guests: number
-  packageType: string
-  notes?: string
-}) => {
-  const user = await getCurrentUser()
-  if (!user) throw new Error("User not authenticated")
+// Support Services
+export const supportService = {
+  async getTickets(parentId: string): Promise<SupportTicket[]> {
+    const { data, error } = await supabase
+      .from("support_tickets")
+      .select("*")
+      .eq("parent_id", parentId)
+      .order("created_at", { ascending: false })
 
-  const { data, error } = await supabase
-    .from("party_bookings")
-    .insert({
-      parent_id: user.id,
-      child_name: bookingData.childName,
-      date: bookingData.date.toISOString().split("T")[0],
-      time: bookingData.time,
-      guests: bookingData.guests,
-      package_type: bookingData.packageType,
-      notes: bookingData.notes || null,
-    })
-    .select()
-    .single()
+    if (error) {
+      console.error("Error fetching tickets:", error)
+      return []
+    }
+    return data || []
+  },
 
-  if (error) throw error
-  return data
-}
+  async createTicket(
+    ticketData: Omit<SupportTicket, "id" | "created_at" | "updated_at">,
+  ): Promise<SupportTicket | null> {
+    const { data, error } = await supabase.from("support_tickets").insert([ticketData]).select().single()
 
-// Support Ticket Services
-export const createSupportTicket = async (ticketData: {
-  type: "doubt" | "suggestion" | "complaint"
-  subject: string
-  description: string
-}) => {
-  const user = await getCurrentUser()
-  if (!user) throw new Error("User not authenticated")
-
-  const { data, error } = await supabase
-    .from("support_tickets")
-    .insert({
-      parent_id: user.id,
-      type: ticketData.type,
-      subject: ticketData.subject,
-      description: ticketData.description,
-    })
-    .select()
-    .single()
-
-  if (error) throw error
-  return data
-}
-
-// Emergency Alert Services
-export const createEmergencyAlert = async (childId: string, type: string, message: string, operatorId: string) => {
-  const { data, error } = await supabase
-    .from("emergency_alerts")
-    .insert({
-      child_id: childId,
-      type,
-      message,
-      operator_id: operatorId,
-    })
-    .select()
-    .single()
-
-  if (error) throw error
-  return data
+    if (error) {
+      console.error("Error creating ticket:", error)
+      return null
+    }
+    return data
+  },
 }
 
 // Admin Services
-export const getDailyStats = async () => {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const tomorrow = new Date(today)
-  tomorrow.setDate(tomorrow.getDate() + 1)
+export const adminService = {
+  async getAllChildren(): Promise<Child[]> {
+    const { data, error } = await supabase
+      .from("children")
+      .select(`
+        *,
+        profiles!children_parent_id_fkey(full_name, email, phone)
+      `)
+      .order("created_at", { ascending: false })
 
-  const { data: sessions, error } = await supabase
-    .from("qr_sessions")
-    .select("*")
-    .gte("created_at", today.toISOString())
-    .lt("created_at", tomorrow.toISOString())
+    if (error) {
+      console.error("Error fetching all children:", error)
+      return []
+    }
+    return data || []
+  },
 
-  if (error) throw error
+  async getAllVisits(): Promise<any[]> {
+    const { data, error } = await supabase
+      .from("visits")
+      .select(`
+        *,
+        children(name, age),
+        children!inner(profiles!children_parent_id_fkey(full_name, phone))
+      `)
+      .order("entry_time", { ascending: false })
+      .limit(50)
 
-  const totalEntries = sessions?.length || 0
-  const activeEntries = sessions?.filter((s) => s.is_active).length || 0
-  const completedEntries = sessions?.filter((s) => s.exit_time).length || 0
+    if (error) {
+      console.error("Error fetching visits:", error)
+      return []
+    }
+    return data || []
+  },
 
-  return {
-    totalEntries,
-    activeEntries,
-    completedEntries,
-  }
+  async getAllParties(): Promise<any[]> {
+    const { data, error } = await supabase
+      .from("parties")
+      .select(`
+        *,
+        profiles!parties_parent_id_fkey(full_name, email, phone)
+      `)
+      .order("date", { ascending: true })
+
+    if (error) {
+      console.error("Error fetching parties:", error)
+      return []
+    }
+    return data || []
+  },
+
+  async getAllTickets(): Promise<any[]> {
+    const { data, error } = await supabase
+      .from("support_tickets")
+      .select(`
+        *,
+        profiles!support_tickets_parent_id_fkey(full_name, email, phone)
+      `)
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      console.error("Error fetching tickets:", error)
+      return []
+    }
+    return data || []
+  },
 }

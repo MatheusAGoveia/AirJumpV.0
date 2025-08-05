@@ -7,175 +7,164 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  ScrollView,
   Alert,
-  Switch,
+  ScrollView,
+  KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
 } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
-import DateTimePicker from "@react-native-community/datetimepicker"
-import { addChild } from "../services/supabaseService"
+import { supabase } from "../lib/supabase"
+import { childrenService } from "../services/supabaseService"
+import { generateQRCode } from "../utils/qrUtils"
 
-interface AddChildScreenProps {
-  navigation: any
-}
-
-export default function AddChildScreen({ navigation }: AddChildScreenProps) {
+export default function AddChildScreen({ navigation }: any) {
   const [name, setName] = useState("")
-  const [birthDate, setBirthDate] = useState(new Date())
-  const [showDatePicker, setShowDatePicker] = useState(false)
-  const [medicalNotes, setMedicalNotes] = useState("")
-  const [hasDisability, setHasDisability] = useState(false)
+  const [age, setAge] = useState("")
+  const [emergencyContact, setEmergencyContact] = useState("")
+  const [medicalInfo, setMedicalInfo] = useState("")
   const [loading, setLoading] = useState(false)
 
-  const handleSubmit = async () => {
-    if (!name.trim()) {
-      Alert.alert("Erro", "Nome é obrigatório")
+  const handleAddChild = async () => {
+    if (!name || !age || !emergencyContact) {
+      Alert.alert("Erro", "Por favor, preencha todos os campos obrigatórios")
+      return
+    }
+
+    const ageNumber = Number.parseInt(age)
+    if (isNaN(ageNumber) || ageNumber < 1 || ageNumber > 17) {
+      Alert.alert("Erro", "Idade deve ser entre 1 e 17 anos")
       return
     }
 
     setLoading(true)
 
     try {
-      await addChild({
-        name: name.trim(),
-        birthDate,
-        medicalNotes: medicalNotes.trim(),
-        hasDisability,
-      })
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) throw new Error("Usuário não encontrado")
 
-      Alert.alert("Sucesso", "Criança cadastrada com sucesso!", [{ text: "OK", onPress: () => navigation.goBack() }])
-    } catch (error) {
-      console.error("Error adding child:", error)
-      Alert.alert("Erro", "Não foi possível cadastrar a criança")
+      const qrCode = generateQRCode(user.id + Date.now(), name)
+
+      const childData = {
+        parent_id: user.id,
+        name: name.trim(),
+        age: ageNumber,
+        emergency_contact: emergencyContact.trim(),
+        medical_info: medicalInfo.trim() || null,
+        qr_code: qrCode,
+        visits: 0,
+      }
+
+      const newChild = await childrenService.addChild(childData)
+
+      if (newChild) {
+        Alert.alert("Sucesso!", "Criança cadastrada com sucesso!", [
+          {
+            text: "Ver QR Code",
+            onPress: () => navigation.navigate("QRCode", { childId: newChild.id }),
+          },
+          {
+            text: "Voltar",
+            onPress: () => navigation.goBack(),
+          },
+        ])
+
+        // Clear form
+        setName("")
+        setAge("")
+        setEmergencyContact("")
+        setMedicalInfo("")
+      } else {
+        throw new Error("Erro ao cadastrar criança")
+      }
+    } catch (error: any) {
+      Alert.alert("Erro", error.message)
     } finally {
       setLoading(false)
     }
   }
 
-  const onDateChange = (event: any, selectedDate?: Date) => {
-    setShowDatePicker(Platform.OS === "ios")
-    if (selectedDate) {
-      setBirthDate(selectedDate)
-    }
-  }
-
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7}>
-          <Ionicons name="arrow-back" size={24} color="#1f2937" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Cadastrar Criança</Text>
-        <View style={{ width: 24 }} />
-      </View>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={24} color="#1e293b" />
+          </TouchableOpacity>
+          <Text style={styles.title}>Adicionar Criança</Text>
+          <View style={styles.placeholder} />
+        </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.form}>
-          <Text style={styles.formTitle}>Informações da Criança</Text>
-          <Text style={styles.formSubtitle}>Preencha os dados para garantir a segurança e diversão</Text>
-
-          {/* Nome */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Nome Completo *</Text>
             <TextInput
               style={styles.input}
-              placeholder="Nome completo da criança"
               value={name}
               onChangeText={setName}
+              placeholder="Digite o nome completo"
               autoCapitalize="words"
-              placeholderTextColor="#9CA3AF"
             />
           </View>
 
-          {/* Data de Nascimento */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Data de Nascimento *</Text>
-            <TouchableOpacity style={styles.dateInput} onPress={() => setShowDatePicker(true)} activeOpacity={0.8}>
-              <Ionicons name="calendar-outline" size={20} color="#666" />
-              <Text style={styles.dateText}>{birthDate.toLocaleDateString("pt-BR")}</Text>
-            </TouchableOpacity>
-
-            {showDatePicker && (
-              <DateTimePicker
-                value={birthDate}
-                mode="date"
-                display="default"
-                onChange={onDateChange}
-                maximumDate={new Date()}
-              />
-            )}
+            <Text style={styles.label}>Idade *</Text>
+            <TextInput
+              style={styles.input}
+              value={age}
+              onChangeText={setAge}
+              placeholder="Digite a idade"
+              keyboardType="numeric"
+              maxLength={2}
+            />
           </View>
 
-          {/* Observações Médicas */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Observações Médicas</Text>
+            <Text style={styles.label}>Contato de Emergência *</Text>
+            <TextInput
+              style={styles.input}
+              value={emergencyContact}
+              onChangeText={setEmergencyContact}
+              placeholder="(11) 99999-9999"
+              keyboardType="phone-pad"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Informações Médicas</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
+              value={medicalInfo}
+              onChangeText={setMedicalInfo}
               placeholder="Alergias, medicamentos, condições especiais..."
-              value={medicalNotes}
-              onChangeText={setMedicalNotes}
               multiline
-              numberOfLines={3}
+              numberOfLines={4}
               textAlignVertical="top"
-              placeholderTextColor="#9CA3AF"
             />
-            <Text style={styles.helperText}>Informações importantes para a segurança da criança</Text>
-          </View>
-
-          {/* Criança com Deficiência */}
-          <View style={styles.switchGroup}>
-            <View style={styles.switchHeader}>
-              <Text style={styles.switchLabel}>Criança com deficiência</Text>
-              <Switch
-                value={hasDisability}
-                onValueChange={setHasDisability}
-                trackColor={{ false: "#E5E7EB", true: "#3B82F6" }}
-                thumbColor={hasDisability ? "#FFFFFF" : "#FFFFFF"}
-              />
-            </View>
-
-            {hasDisability && (
-              <View style={styles.disabilityInfo}>
-                <Text style={styles.disabilityTitle}>⚠️ Benefícios da Legislação Estadual:</Text>
-                <View style={styles.benefitsList}>
-                  <Text style={styles.benefitItem}>• 1ª e 2ª criança com deficiência: entrada gratuita</Text>
-                  <Text style={styles.benefitItem}>• 3ª criança em diante: 50% de desconto</Text>
-                  <Text style={styles.benefitItem}>• Responsável deve permanecer na loja</Text>
-                </View>
-
-                <TouchableOpacity style={styles.documentUpload} activeOpacity={0.8}>
-                  <Ionicons name="cloud-upload-outline" size={24} color="#3B82F6" />
-                  <Text style={styles.documentUploadText}>Upload do documento comprobatório</Text>
-                  <Text style={styles.documentUploadSubtext}>Laudo médico ou documento oficial</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-
-          {/* Tags Automáticas */}
-          <View style={styles.tagsInfo}>
-            <Text style={styles.tagsTitle}>Tags Automáticas:</Text>
-            <View style={styles.tagsList}>
-              <Text style={styles.tagItem}>⚠️ Deficiência (se aplicável)</Text>
-              <Text style={styles.tagItem}>🥸 Menor de 5 anos (calculado automaticamente)</Text>
-              <Text style={styles.tagItem}>👦 Cliente menor de idade (calculado automaticamente)</Text>
-            </View>
           </View>
 
           <TouchableOpacity
-            style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-            onPress={handleSubmit}
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleAddChild}
             disabled={loading}
-            activeOpacity={0.8}
           >
-            <Text style={styles.submitButtonText}>{loading ? "Cadastrando..." : "Cadastrar Criança"}</Text>
+            <Text style={styles.buttonText}>{loading ? "Cadastrando..." : "Cadastrar Criança"}</Text>
           </TouchableOpacity>
+
+          <View style={styles.infoCard}>
+            <Ionicons name="information-circle" size={24} color="#3B82F6" />
+            <View style={styles.infoText}>
+              <Text style={styles.infoTitle}>QR Code Automático</Text>
+              <Text style={styles.infoDescription}>
+                Um QR Code único será gerado automaticamente para esta criança, permitindo entrada e saída rápida no
+                parque.
+              </Text>
+            </View>
+          </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </KeyboardAvoidingView>
   )
 }
 
@@ -184,174 +173,87 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f8fafc",
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 20,
-    backgroundColor: "white",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#1f2937",
-  },
-  content: {
+  scrollView: {
     flex: 1,
   },
-  form: {
-    backgroundColor: "white",
-    margin: 16,
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     padding: 20,
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    paddingTop: 60,
+    backgroundColor: "#fff",
   },
-  formTitle: {
+  backButton: {
+    padding: 8,
+  },
+  title: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#1f2937",
-    marginBottom: 4,
+    color: "#1e293b",
   },
-  formSubtitle: {
-    fontSize: 14,
-    color: "#6b7280",
-    marginBottom: 24,
+  placeholder: {
+    width: 40,
+  },
+  form: {
+    padding: 20,
   },
   inputGroup: {
     marginBottom: 20,
   },
   label: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "600",
-    color: "#374151",
+    color: "#1e293b",
     marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderColor: "#d1d5db",
+    borderColor: "#e2e8f0",
     borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    padding: 12,
     fontSize: 16,
-    backgroundColor: "white",
-    color: "#1f2937",
+    backgroundColor: "#fff",
   },
   textArea: {
-    height: 80,
-    textAlignVertical: "top",
+    height: 100,
+    paddingTop: 12,
   },
-  dateInput: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#d1d5db",
+  button: {
+    backgroundColor: "#3B82F6",
+    padding: 16,
     borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    backgroundColor: "white",
-  },
-  dateText: {
-    fontSize: 16,
-    color: "#1f2937",
-    marginLeft: 8,
-  },
-  helperText: {
-    fontSize: 12,
-    color: "#6b7280",
-    marginTop: 4,
-  },
-  switchGroup: {
+    alignItems: "center",
     marginBottom: 20,
   },
-  switchHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  switchLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#374151",
-  },
-  disabilityInfo: {
-    backgroundColor: "#EBF8FF",
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#BFDBFE",
-  },
-  disabilityTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#1E40AF",
-    marginBottom: 8,
-  },
-  benefitsList: {
-    marginBottom: 16,
-  },
-  benefitItem: {
-    fontSize: 12,
-    color: "#1E40AF",
-    marginBottom: 4,
-  },
-  documentUpload: {
-    alignItems: "center",
-    padding: 16,
-    borderWidth: 2,
-    borderColor: "#BFDBFE",
-    borderStyle: "dashed",
-    borderRadius: 8,
-    backgroundColor: "white",
-  },
-  documentUploadText: {
-    fontSize: 12,
-    color: "#3B82F6",
-    fontWeight: "600",
-    marginTop: 4,
-  },
-  documentUploadSubtext: {
-    fontSize: 10,
-    color: "#6B7280",
-    marginTop: 2,
-  },
-  tagsInfo: {
-    backgroundColor: "#F9FAFB",
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 24,
-  },
-  tagsTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#374151",
-    marginBottom: 8,
-  },
-  tagsList: {
-    gap: 4,
-  },
-  tagItem: {
-    fontSize: 12,
-    color: "#6B7280",
-  },
-  submitButton: {
-    backgroundColor: "#3B82F6",
-    borderRadius: 8,
-    paddingVertical: 16,
-    alignItems: "center",
-  },
-  submitButtonDisabled: {
+  buttonDisabled: {
     opacity: 0.6,
   },
-  submitButtonText: {
-    color: "white",
+  buttonText: {
+    color: "#fff",
     fontSize: 16,
     fontWeight: "600",
+  },
+  infoCard: {
+    backgroundColor: "#eff6ff",
+    padding: 16,
+    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  infoText: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  infoTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#1e40af",
+    marginBottom: 4,
+  },
+  infoDescription: {
+    fontSize: 12,
+    color: "#1e40af",
+    lineHeight: 16,
   },
 })
