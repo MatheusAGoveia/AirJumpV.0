@@ -9,7 +9,7 @@ import { Ionicons } from "@expo/vector-icons"
 import type { Session } from "@supabase/supabase-js"
 
 // Supabase
-import { supabase, testSupabaseConnection } from "./src/lib/supabase"
+import { supabase } from "./src/lib/supabase"
 
 // Screens
 import LoginScreen from "./src/screens/LoginScreen"
@@ -79,9 +79,6 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Test Supabase connection
-    testSupabaseConnection()
-
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)

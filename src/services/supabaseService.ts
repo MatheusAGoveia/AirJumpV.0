@@ -51,21 +51,6 @@ export const getCurrentUser = async () => {
   return user
 }
 
-// Profile Services
-export const getProfile = async (userId: string) => {
-  const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single()
-
-  if (error) throw error
-  return data
-}
-
-export const updateProfile = async (userId: string, updates: Partial<Tables["profiles"]["Update"]>) => {
-  const { data, error } = await supabase.from("profiles").update(updates).eq("id", userId).select().single()
-
-  if (error) throw error
-  return data
-}
-
 // Children Services
 export const addChild = async (childData: {
   name: string
@@ -118,19 +103,6 @@ export const getChild = async (childId: string): Promise<Child> => {
 
   if (error) throw error
   return data
-}
-
-export const updateChild = async (childId: string, updates: Partial<Tables["children"]["Update"]>) => {
-  const { data, error } = await supabase.from("children").update(updates).eq("id", childId).select().single()
-
-  if (error) throw error
-  return data
-}
-
-export const deleteChild = async (childId: string) => {
-  const { error } = await supabase.from("children").delete().eq("id", childId)
-
-  if (error) throw error
 }
 
 // QR Session Services
@@ -303,20 +275,6 @@ export const createPartyBooking = async (bookingData: {
   return data
 }
 
-export const getPartyBookings = async (): Promise<PartyBooking[]> => {
-  const user = await getCurrentUser()
-  if (!user) throw new Error("User not authenticated")
-
-  const { data, error } = await supabase
-    .from("party_bookings")
-    .select("*")
-    .eq("parent_id", user.id)
-    .order("created_at", { ascending: false })
-
-  if (error) throw error
-  return data || []
-}
-
 // Support Ticket Services
 export const createSupportTicket = async (ticketData: {
   type: "doubt" | "suggestion" | "complaint"
@@ -341,20 +299,6 @@ export const createSupportTicket = async (ticketData: {
   return data
 }
 
-export const getSupportTickets = async (): Promise<SupportTicket[]> => {
-  const user = await getCurrentUser()
-  if (!user) throw new Error("User not authenticated")
-
-  const { data, error } = await supabase
-    .from("support_tickets")
-    .select("*")
-    .eq("parent_id", user.id)
-    .order("created_at", { ascending: false })
-
-  if (error) throw error
-  return data || []
-}
-
 // Emergency Alert Services
 export const createEmergencyAlert = async (childId: string, type: string, message: string, operatorId: string) => {
   const { data, error } = await supabase
@@ -369,10 +313,6 @@ export const createEmergencyAlert = async (childId: string, type: string, messag
     .single()
 
   if (error) throw error
-
-  // Here you would send push notification to parent
-  // await sendPushNotification(childId, type, message);
-
   return data
 }
 
@@ -400,19 +340,4 @@ export const getDailyStats = async () => {
     activeEntries,
     completedEntries,
   }
-}
-
-// Real-time subscriptions
-export const subscribeToQRSessions = (callback: (payload: any) => void) => {
-  return supabase
-    .channel("qr_sessions_changes")
-    .on("postgres_changes", { event: "*", schema: "public", table: "qr_sessions" }, callback)
-    .subscribe()
-}
-
-export const subscribeToEmergencyAlerts = (callback: (payload: any) => void) => {
-  return supabase
-    .channel("emergency_alerts_changes")
-    .on("postgres_changes", { event: "INSERT", schema: "public", table: "emergency_alerts" }, callback)
-    .subscribe()
 }

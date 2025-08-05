@@ -61,6 +61,7 @@
     "expo-camera": "~13.4.4",
     "expo-font": "latest",
     "expo-image-picker": "~14.3.2",
+    "expo-linking": "latest",
     "expo-notifications": "~0.20.1",
     "expo-status-bar": "latest",
     "firebase": "latest",

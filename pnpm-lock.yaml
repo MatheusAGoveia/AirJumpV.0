@@ -152,6 +152,9 @@ importers:
       expo-image-picker:
         specifier: ~14.3.2
         version: 14.3.2(expo@49.0.15(@babel/core@7.20.2))
+      expo-linking:
+        specifier: latest
+        version: 7.1.7(expo@49.0.15(@babel/core@7.20.2))(react-native@0.80.2(@babel/core@7.20.2)(@react-native-community/cli@15.1.3(typescript@5.0.2))(@types/react@18.0.0)(react@18.0.0))(react@18.0.0)
       expo-notifications:
         specifier: ~0.20.1
         version: 0.20.1(expo@49.0.15(@babel/core@7.20.2))
@@ -1048,11 +1051,20 @@ packages:
   '@expo/code-signing-certificates@0.0.5':
     resolution: {integrity: sha512-BNhXkY1bblxKZpltzAx98G2Egj9g1Q+JRcvR7E99DOj862FTCX+ZPsAUtPTr7aHxwtrL7+fL3r0JSmM9kBm+Bw==}
 
+  '@expo/config-plugins@10.1.2':
+    resolution: {integrity: sha512-IMYCxBOcnuFStuK0Ay+FzEIBKrwW8OVUMc65+v0+i7YFIIe8aL342l7T4F8lR4oCfhXn7d6M5QPgXvjtc/gAcw==}
+
   '@expo/config-plugins@7.2.5':
     resolution: {integrity: sha512-w+5ccu1IxBHgyQk9CPFKLZOk8yZQEyTjbJwOzESK1eR7QwosbcsLkN1c1WWUZYiCXwORu3UTwJYll4+X2xxJhQ==}
 
   '@expo/config-types@49.0.0':
     resolution: {integrity: sha512-8eyREVi+K2acnMBe/rTIu1dOfyR2+AMnTLHlut+YpMV9OZPdeKV0Bs9BxAewGqBA2slslbQ9N39IS2CuTKpXkA==}
+
+  '@expo/config-types@53.0.5':
+    resolution: {integrity: sha512-kqZ0w44E+HEGBjy+Lpyn0BVL5UANg/tmNixxaRMLS6nf37YsDrLk2VMAmeKMMk5CKG0NmOdVv3ngeUjRQMsy9g==}
+
+  '@expo/config@11.0.13':
+    resolution: {integrity: sha512-TnGb4u/zUZetpav9sx/3fWK71oCPaOjZHoVED9NaEncktAd0Eonhq5NUghiJmkUGt3gGSjRAEBXiBbbY9/B1LA==}
 
   '@expo/config@8.1.2':
     resolution: {integrity: sha512-4e7hzPj50mQIlsrzOH6XZ36O094mPfPTIDIH4yv49bWNMc7GFLTofB/lcT+QyxiLaJuC0Wlk9yOLB8DIqmtwug==}
@@ -1066,6 +1078,9 @@ packages:
   '@expo/env@0.0.5':
     resolution: {integrity: sha512-UXuKAqyXfhMQC3gP0OyjXmFX08Z1fkVWiGBN7bYzfoX8LHatjeHrDtI6w5nDvd8XPxPvmqaZoEDw1lW3+dz3oQ==}
 
+  '@expo/env@1.0.7':
+    resolution: {integrity: sha512-qSTEnwvuYJ3umapO9XJtrb1fAqiPlmUUg78N0IZXXGwQRt+bkp0OBls+Y5Mxw/Owj8waAM0Z3huKKskRADR5ow==}
+
   '@expo/image-utils@0.3.22':
     resolution: {integrity: sha512-uzq+RERAtkWypOFOLssFnXXqEqKjNj9eXN7e97d/EXUAojNcLDoXc0sL+F5B1I4qtlsnhX01kcpoIBBZD8wZNQ==}
 
@@ -1077,6 +1092,9 @@ packages:
 
   '@expo/json-file@8.3.3':
     resolution: {integrity: sha512-eZ5dld9AD0PrVRiIWpRkm5aIoWBw3kAyd8VkuWEy92sEthBKDDDHAnK2a0dw0Eil6j7rK7lS/Qaq/Zzngv2h5A==}
+
+  '@expo/json-file@9.1.5':
+    resolution: {integrity: sha512-prWBhLUlmcQtvN6Y7BpW2k9zXGd3ySa3R6rAguMJkp1z22nunLN64KYTUWfijFlprFoxm9r2VNnGkcbndAlgKA==}
 
   '@expo/metro-config@0.10.7':
     resolution: {integrity: sha512-uACymEiyX0447hI4unt+2cemLQkTZXKvTev936NhtsgVnql45EP0V0pzmo/0H0WlHaAGXgvOBZJl8wFqcJ3CbQ==}
@@ -1094,6 +1112,9 @@ packages:
 
   '@expo/plist@0.0.20':
     resolution: {integrity: sha512-UXQ4LXCfTZ580LDHGJ5q62jSTwJFFJ1GqBu8duQMThiHKWbMJ+gajJh6rsB6EJ3aLUr9wcauxneL5LVRFxwBEA==}
+
+  '@expo/plist@0.3.5':
+    resolution: {integrity: sha512-9RYVU1iGyCJ7vWfg3e7c/NVyMFs8wbl+dMWZphtFtsqyN9zppGREU3ctlD3i8KUE0sCUTVnLjCWr+VeUIDep2g==}
 
   '@expo/prebuild-config@6.2.6':
     resolution: {integrity: sha512-uFVvDAm9dPg9p1qpnr4CVnpo2hmkZIL5FQz+VlIdXXJpe7ySh/qTGHtKWY/lWUshQkAJ0nwbKGPztGWdABns/Q==}
@@ -3473,8 +3494,16 @@ packages:
     resolution: {integrity: sha512-GopVGCpVS1UKH75VKHGuQFqS1Gusej0z4FyQkPdwjil2gNIv+LNsqBlboOzpJFZKVT95GkCyWJbBSdFEFUWI2A==}
     engines: {node: '>=12'}
 
+  dotenv-expand@11.0.7:
+    resolution: {integrity: sha512-zIHwmZPRshsCdpMDyVsqGmgyP0yT8GAgXUnkdAoJisxvf33k7yO6OuoKmcTGuXPWSsm8Oh88nZicRLA9Y0rUeA==}
+    engines: {node: '>=12'}
+
   dotenv@16.0.3:
     resolution: {integrity: sha512-7GO6HghkA5fYG9TYnNxi14/7K9f5occMlp3zXAuSxn7CKCxt9xbNWG7yF8hTCSUchlfWSe3uLmlPfigevRItzQ==}
+    engines: {node: '>=12'}
+
+  dotenv@16.4.7:
+    resolution: {integrity: sha512-47qPchRCykZC03FhkYAhrvwU4xDBFIj1QPqaarj6mdM/hgUzfPHcpkHJOn3mJAufFeeAxAzeGsr5X0M4k6fLZQ==}
     engines: {node: '>=12'}
 
   dunder-proto@1.0.1:
@@ -3652,6 +3681,12 @@ packages:
     peerDependencies:
       expo: '*'
 
+  expo-constants@17.1.7:
+    resolution: {integrity: sha512-byBjGsJ6T6FrLlhOBxw4EaiMXrZEn/MlUYIj/JAd+FS7ll5X/S4qVRbIimSJtdW47hXMq0zxPfJX6njtA56hHA==}
+    peerDependencies:
+      expo: '*'
+      react-native: '*'
+
   expo-file-system@15.4.5:
     resolution: {integrity: sha512-xy61KaTaDgXhT/dllwYDHm3ch026EyO8j4eC6wSVr/yE12MMMxAC09yGwy4f7kkOs6ztGVQF5j7ldRzNLN4l0Q==}
     peerDependencies:
@@ -3687,6 +3722,12 @@ packages:
     resolution: {integrity: sha512-ujiJg1p9EdCOYS05jh5PtUrfiZnK0yyLy+UewzqrjUqIT8eAGMQbkfOn3C3fHE7AKd5AefSMzJnS3lYZcZYHDw==}
     peerDependencies:
       expo: '*'
+
+  expo-linking@7.1.7:
+    resolution: {integrity: sha512-ZJaH1RIch2G/M3hx2QJdlrKbYFUTOjVVW4g39hfxrE5bPX9xhZUYXqxqQtzMNl1ylAevw9JkgEfWbBWddbZ3UA==}
+    peerDependencies:
+      react: '*'
+      react-native: '*'
 
   expo-modules-autolinking@1.5.1:
     resolution: {integrity: sha512-yt5a1VCp2BF9CrsO689PCD5oXKP14MMhnOanQMvDn4BDpURYfzAlDVGC5fZrNQKtwn/eq3bcrxIwZ7D9QjVVRg==}
@@ -3899,6 +3940,10 @@ packages:
 
   getenv@1.0.0:
     resolution: {integrity: sha512-7yetJWqbS9sbn0vIfliPsFgoXMKn/YMF+Wuiog97x+urnSRRRZ7xB+uVkwGKzRgq9CDFfMQnE9ruL5DHv9c6Xg==}
+    engines: {node: '>=6'}
+
+  getenv@2.0.0:
+    resolution: {integrity: sha512-VilgtJj/ALgGY77fiLam5iD336eSWi96Q15JSAG1zi8NRBysm3LXKdGnHb4m5cuyxvOLQQKWpBZAT6ni4FI2iQ==}
     engines: {node: '>=6'}
 
   glob-parent@5.1.2:
@@ -5544,6 +5589,9 @@ packages:
   resolve-from@5.0.0:
     resolution: {integrity: sha512-qYg9KP24dD5qka9J47d0aVky0N+b4fTU89LN9iDnjB5waksiC49rvMB0PrUJQGoTmH50XPiqOvAjDfaijGxYZw==}
     engines: {node: '>=8'}
+
+  resolve-workspace-root@2.0.0:
+    resolution: {integrity: sha512-IsaBUZETJD5WsI11Wt8PKHwaIe45or6pwNc8yflvLJ4DWtImK9kuLoH5kUva/2Mmx/RdIyr4aONNSa2v9LTJsw==}
 
   resolve@1.22.10:
     resolution: {integrity: sha512-NPRy+/ncIMeDlTAsuqwKIiferiawhefFJtkNSW0qZJEqMEb+qBt/77B/jGeeek+F0uOeN05CDa6HXbbIgtVX4w==}
@@ -7485,6 +7533,25 @@ snapshots:
       node-forge: 1.3.1
       nullthrows: 1.1.1
 
+  '@expo/config-plugins@10.1.2':
+    dependencies:
+      '@expo/config-types': 53.0.5
+      '@expo/json-file': 9.1.5
+      '@expo/plist': 0.3.5
+      '@expo/sdk-runtime-versions': 1.0.0
+      chalk: 4.1.2
+      debug: 4.4.1
+      getenv: 2.0.0
+      glob: 10.4.5
+      resolve-from: 5.0.0
+      semver: 7.7.2
+      slash: 3.0.0
+      slugify: 1.6.6
+      xcode: 3.0.1
+      xml2js: 0.6.0
+    transitivePeerDependencies:
+      - supports-color
+
   '@expo/config-plugins@7.2.5':
     dependencies:
       '@expo/config-types': 49.0.0
@@ -7506,6 +7573,26 @@ snapshots:
       - supports-color
 
   '@expo/config-types@49.0.0': {}
+
+  '@expo/config-types@53.0.5': {}
+
+  '@expo/config@11.0.13':
+    dependencies:
+      '@babel/code-frame': 7.10.4
+      '@expo/config-plugins': 10.1.2
+      '@expo/config-types': 53.0.5
+      '@expo/json-file': 9.1.5
+      deepmerge: 4.3.1
+      getenv: 2.0.0
+      glob: 10.4.5
+      require-from-string: 2.0.2
+      resolve-from: 5.0.0
+      resolve-workspace-root: 2.0.0
+      semver: 7.7.2
+      slugify: 1.6.6
+      sucrase: 3.35.0
+    transitivePeerDependencies:
+      - supports-color
 
   '@expo/config@8.1.2':
     dependencies:
@@ -7562,6 +7649,16 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  '@expo/env@1.0.7':
+    dependencies:
+      chalk: 4.1.2
+      debug: 4.4.1
+      dotenv: 16.4.7
+      dotenv-expand: 11.0.7
+      getenv: 2.0.0
+    transitivePeerDependencies:
+      - supports-color
+
   '@expo/image-utils@0.3.22':
     dependencies:
       '@expo/spawn-async': 1.5.0
@@ -7605,6 +7702,11 @@ snapshots:
       '@babel/code-frame': 7.10.4
       json5: 2.2.3
       write-file-atomic: 2.4.3
+
+  '@expo/json-file@9.1.5':
+    dependencies:
+      '@babel/code-frame': 7.10.4
+      json5: 2.2.3
 
   '@expo/metro-config@0.10.7':
     dependencies:
@@ -7652,6 +7754,12 @@ snapshots:
       '@xmldom/xmldom': 0.7.13
       base64-js: 1.5.1
       xmlbuilder: 14.0.0
+
+  '@expo/plist@0.3.5':
+    dependencies:
+      '@xmldom/xmldom': 0.8.10
+      base64-js: 1.5.1
+      xmlbuilder: 15.1.1
 
   '@expo/prebuild-config@6.2.6(expo-modules-autolinking@1.5.1)':
     dependencies:
@@ -10488,7 +10596,13 @@ snapshots:
 
   dotenv-expand@10.0.0: {}
 
+  dotenv-expand@11.0.7:
+    dependencies:
+      dotenv: 16.4.7
+
   dotenv@16.0.3: {}
+
+  dotenv@16.4.7: {}
 
   dunder-proto@1.0.1:
     dependencies:
@@ -10721,6 +10835,15 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  expo-constants@17.1.7(expo@49.0.15(@babel/core@7.20.2))(react-native@0.80.2(@babel/core@7.20.2)(@react-native-community/cli@15.1.3(typescript@5.0.2))(@types/react@18.0.0)(react@18.0.0)):
+    dependencies:
+      '@expo/config': 11.0.13
+      '@expo/env': 1.0.7
+      expo: 49.0.15(@babel/core@7.20.2)
+      react-native: 0.80.2(@babel/core@7.20.2)(@react-native-community/cli@15.1.3(typescript@5.0.2))(@types/react@18.0.0)(react@18.0.0)
+    transitivePeerDependencies:
+      - supports-color
+
   expo-file-system@15.4.5(expo@49.0.15(@babel/core@7.20.2)):
     dependencies:
       expo: 49.0.15(@babel/core@7.20.2)
@@ -10753,6 +10876,16 @@ snapshots:
   expo-keep-awake@12.3.0(expo@49.0.15(@babel/core@7.20.2)):
     dependencies:
       expo: 49.0.15(@babel/core@7.20.2)
+
+  expo-linking@7.1.7(expo@49.0.15(@babel/core@7.20.2))(react-native@0.80.2(@babel/core@7.20.2)(@react-native-community/cli@15.1.3(typescript@5.0.2))(@types/react@18.0.0)(react@18.0.0))(react@18.0.0):
+    dependencies:
+      expo-constants: 17.1.7(expo@49.0.15(@babel/core@7.20.2))(react-native@0.80.2(@babel/core@7.20.2)(@react-native-community/cli@15.1.3(typescript@5.0.2))(@types/react@18.0.0)(react@18.0.0))
+      invariant: 2.2.4
+      react: 18.0.0
+      react-native: 0.80.2(@babel/core@7.20.2)(@react-native-community/cli@15.1.3(typescript@5.0.2))(@types/react@18.0.0)(react@18.0.0)
+    transitivePeerDependencies:
+      - expo
+      - supports-color
 
   expo-modules-autolinking@1.5.1:
     dependencies:
@@ -11071,6 +11204,8 @@ snapshots:
       get-intrinsic: 1.3.0
 
   getenv@1.0.0: {}
+
+  getenv@2.0.0: {}
 
   glob-parent@5.1.2:
     dependencies:
@@ -12933,6 +13068,8 @@ snapshots:
   resolve-from@4.0.0: {}
 
   resolve-from@5.0.0: {}
+
+  resolve-workspace-root@2.0.0: {}
 
   resolve@1.22.10:
     dependencies:

@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "Air Jump Monte Carmo",
+    "slug": "air-jump-monte-carmo",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#3B82F6"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.airjump.montecarmo"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#3B82F6"
+      },
+      "package": "com.airjump.montecarmo",
+      "permissions": ["android.permission.CAMERA"]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-barcode-scanner",
+        {
+          "cameraPermission": "Allow Air Jump to access camera for QR code scanning."
+        }
+      ]
+    ]
+  }
+}

@@ -6,7 +6,7 @@ const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error("Missing Supabase environment variables")
+  throw new Error("Missing Supabase environment variables. Please check your .env file.")
 }
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
@@ -18,12 +18,12 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   },
 })
 
-// Test connection
+// Test connection function
 export const testSupabaseConnection = async () => {
   try {
     const { data, error } = await supabase.from("profiles").select("count").limit(1)
     if (error) {
-      console.error("Supabase connection error:", error)
+      console.error("❌ Supabase connection error:", error)
       return false
     }
     console.log("✅ Supabase connected successfully")

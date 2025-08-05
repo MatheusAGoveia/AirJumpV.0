@@ -1,19 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Alert,
-  SafeAreaView,
-  Linking,
-} from "react-native"
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, SafeAreaView } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { Picker } from "@react-native-picker/picker"
+import * as Linking from "expo-linking"
 import { createSupportTicket } from "../services/supabaseService"
 
 interface SupportScreenProps {
