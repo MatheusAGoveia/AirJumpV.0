@@ -4,11 +4,12 @@ import { useEffect, useState } from "react"
 import { NavigationContainer } from "@react-navigation/native"
 import { createStackNavigator } from "@react-navigation/stack"
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs"
-import { initializeApp } from "firebase/app"
-import { getAuth, onAuthStateChanged, type User } from "firebase/auth"
-import { getFirestore } from "firebase/firestore"
 import { StatusBar } from "expo-status-bar"
 import { Ionicons } from "@expo/vector-icons"
+import type { Session } from "@supabase/supabase-js"
+
+// Supabase
+import { supabase, testSupabaseConnection } from "./src/lib/supabase"
 
 // Screens
 import LoginScreen from "./src/screens/LoginScreen"
@@ -19,21 +20,6 @@ import PartyBookingScreen from "./src/screens/PartyBookingScreen"
 import SupportScreen from "./src/screens/SupportScreen"
 import AdminDashboardScreen from "./src/screens/AdminDashboardScreen"
 import AdminScannerScreen from "./src/screens/AdminScannerScreen"
-
-// Firebase config
-const firebaseConfig = {
-  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
-}
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig)
-export const auth = getAuth(app)
-export const db = getFirestore(app)
 
 const Stack = createStackNavigator()
 const Tab = createBottomTabNavigator()
@@ -83,16 +69,28 @@ function MainTabNavigator() {
 }
 
 export default function App() {
-  const [user, setUser] = useState<User | null>(null)
+  const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user)
+    // Test Supabase connection
+    testSupabaseConnection()
+
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
       setIsLoading(false)
     })
 
-    return unsubscribe
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+      setIsLoading(false)
+    })
+
+    return () => subscription.unsubscribe()
   }, [])
 
   if (isLoading) {
@@ -103,7 +101,7 @@ export default function App() {
     <NavigationContainer>
       <StatusBar style="auto" />
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {user ? (
+        {session ? (
           <>
             <Stack.Screen name="Main" component={MainTabNavigator} />
             <Stack.Screen name="QRCode" component={QRCodeScreen} />

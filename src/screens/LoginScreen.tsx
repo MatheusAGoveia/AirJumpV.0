@@ -13,8 +13,7 @@ import {
   ScrollView,
 } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from "firebase/auth"
-import { auth } from "../../App"
+import { signIn, signUp } from "../services/supabaseService"
 
 export default function LoginScreen() {
   const [isLogin, setIsLogin] = useState(true)
@@ -34,35 +33,26 @@ export default function LoginScreen() {
 
     try {
       if (isLogin) {
-        await signInWithEmailAndPassword(auth, email, password)
+        await signIn(email, password)
       } else {
         if (!name) {
           Alert.alert("Erro", "Nome é obrigatório para cadastro")
           return
         }
-
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password)
-        await updateProfile(userCredential.user, {
-          displayName: name,
-        })
+        await signUp(email, password, name, phone)
+        Alert.alert("Sucesso", "Conta criada com sucesso!")
       }
     } catch (error: any) {
       let errorMessage = "Ocorreu um erro. Tente novamente."
 
-      switch (error.code) {
-        case "auth/user-not-found":
-        case "auth/wrong-password":
-          errorMessage = "Email ou senha incorretos"
-          break
-        case "auth/email-already-in-use":
-          errorMessage = "Este email já está em uso"
-          break
-        case "auth/weak-password":
-          errorMessage = "A senha deve ter pelo menos 6 caracteres"
-          break
-        case "auth/invalid-email":
-          errorMessage = "Email inválido"
-          break
+      if (error.message?.includes("Invalid login credentials")) {
+        errorMessage = "Email ou senha incorretos"
+      } else if (error.message?.includes("User already registered")) {
+        errorMessage = "Este email já está em uso"
+      } else if (error.message?.includes("Password should be at least")) {
+        errorMessage = "A senha deve ter pelo menos 6 caracteres"
+      } else if (error.message?.includes("Invalid email")) {
+        errorMessage = "Email inválido"
       }
 
       Alert.alert("Erro", errorMessage)
